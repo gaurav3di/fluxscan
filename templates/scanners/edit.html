@@ -1,0 +1,433 @@
+{% extends "layout/base.html" %}
+
+{% block title %}{% if scanner %}Edit Scanner{% else %}New Scanner{% endif %} - FluxScan{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-6xl">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">
+            {% if scanner %}Edit Scanner{% else %}New Scanner{% endif %}
+        </h1>
+        <a href="{{ url_for('scanners.list_scanners') }}" class="btn btn-ghost">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+            </svg>
+            Back to Scanners
+        </a>
+    </div>
+
+    <!-- Main Form -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column - Scanner Details -->
+        <div class="lg:col-span-2">
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Scanner Details</h2>
+
+                    <div class="form-control w-full">
+                        <label class="label">
+                            <span class="label-text">Scanner Name</span>
+                            <span class="label-text-alt text-error">*</span>
+                        </label>
+                        <input type="text" id="scanner-name" placeholder="e.g., MACD Bullish Crossover"
+                               class="input input-bordered w-full"
+                               value="{{ scanner.name if scanner else '' }}" required />
+                    </div>
+
+                    <div class="form-control w-full">
+                        <label class="label">
+                            <span class="label-text">Description</span>
+                        </label>
+                        <textarea id="scanner-description" class="textarea textarea-bordered h-20"
+                                  placeholder="Describe what this scanner does...">{{ scanner.description if scanner else '' }}</textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Category</span>
+                            </label>
+                            <select id="scanner-category" class="select select-bordered">
+                                <option value="custom" {% if scanner and scanner.category == 'custom' %}selected{% endif %}>Custom</option>
+                                <option value="momentum" {% if scanner and scanner.category == 'momentum' %}selected{% endif %}>Momentum</option>
+                                <option value="trend" {% if scanner and scanner.category == 'trend' %}selected{% endif %}>Trend</option>
+                                <option value="volume" {% if scanner and scanner.category == 'volume' %}selected{% endif %}>Volume</option>
+                                <option value="volatility" {% if scanner and scanner.category == 'volatility' %}selected{% endif %}>Volatility</option>
+                            </select>
+                        </div>
+
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Status</span>
+                            </label>
+                            <input type="checkbox" id="scanner-active" class="toggle toggle-success"
+                                   {% if not scanner or scanner.is_active %}checked{% endif %} />
+                        </div>
+                    </div>
+
+                    <!-- Code Editor -->
+                    <div class="divider">Scanner Code</div>
+
+                    <div class="tabs tabs-boxed mb-4">
+                        <a class="tab tab-active" onclick="showTab('code')">Code</a>
+                        <a class="tab" onclick="showTab('templates')">Templates</a>
+                        <a class="tab" onclick="showTab('help')">Help</a>
+                    </div>
+
+                    <div id="code-tab">
+                        <div class="form-control">
+                            <textarea id="scanner-code" class="textarea textarea-bordered font-mono text-sm h-96 bg-base-200"
+                                      placeholder="# Write your scanner code here&#10;# Available variables: data, open, high, low, close, volume, symbol, params&#10;# Available libraries: pd, np, talib&#10;&#10;# Example:&#10;signal = False&#10;if close[-1] > close[-2]:&#10;    signal = True&#10;    signal_type = 'BUY'&#10;    metrics = {'price': float(close[-1])}"
+                            >{{ scanner.code if scanner else '' }}</textarea>
+                        </div>
+
+                        <div class="flex gap-2 mt-4">
+                            <button class="btn btn-sm btn-ghost" onclick="validateCode()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                </svg>
+                                Validate
+                            </button>
+                            <button class="btn btn-sm btn-ghost" onclick="formatCode()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+                                </svg>
+                                Format
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="templates-tab" class="hidden">
+                        <div class="grid grid-cols-1 gap-2">
+                            {% if templates %}
+                            {% for template in templates %}
+                            <div class="card bg-base-200 cursor-pointer hover:bg-base-300" onclick="loadTemplate({{ template.id }})">
+                                <div class="card-body p-4">
+                                    <h3 class="font-bold">{{ template.name }}</h3>
+                                    <p class="text-sm opacity-70">{{ template.description }}</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% else %}
+                            <p class="text-center opacity-70">No templates available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div id="help-tab" class="hidden">
+                        <div class="prose max-w-none">
+                            <h4>Quick Reference</h4>
+                            <pre class="language-python"><code># Available variables:
+data: pd.DataFrame  # Full OHLCV data
+open, high, low, close, volume: numpy arrays
+symbol: str  # Current symbol
+params: dict  # Scanner parameters
+
+# Required output:
+signal = True/False  # Must set this
+signal_type = 'BUY'/'SELL'/'WATCH'  # If signal=True
+metrics = {'key': value}  # Optional metrics
+
+# Example - RSI Scanner:
+rsi = talib.RSI(close, timeperiod=14)
+if rsi[-1] < 30:
+    signal = True
+    signal_type = 'BUY'
+    metrics = {'rsi': float(rsi[-1])}
+else:
+    signal = False</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Validation Results -->
+                    <div id="validation-results" class="hidden mt-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Parameters & Test -->
+        <div>
+            <!-- Parameters -->
+            <div class="card bg-base-100 shadow-xl mb-6">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Parameters</h2>
+
+                    <div id="parameters-list">
+                        <!-- Parameters will be added dynamically -->
+                    </div>
+
+                    <button class="btn btn-sm btn-ghost w-full mt-2" onclick="addParameter()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                        Add Parameter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Test Scanner -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Test Scanner</h2>
+
+                    <div class="form-control w-full">
+                        <label class="label">
+                            <span class="label-text">Test Symbols</span>
+                        </label>
+                        <input type="text" id="test-symbols" placeholder="RELIANCE,TCS,INFY"
+                               class="input input-bordered w-full"
+                               value="RELIANCE,TCS,INFY" />
+                    </div>
+
+                    <button class="btn btn-secondary w-full mt-4" onclick="testScanner()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                        </svg>
+                        Run Test
+                    </button>
+
+                    <div id="test-results" class="mt-4 hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex justify-end gap-4 mt-6">
+        <a href="{{ url_for('scanners.list_scanners') }}" class="btn btn-ghost">Cancel</a>
+        <button class="btn btn-primary" onclick="saveScanner()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+            </svg>
+            Save Scanner
+        </button>
+    </div>
+</div>
+
+<script>
+const scannerId = {{ scanner.id if scanner else 'null' }};
+const scannerParams = {{ (scanner.get_parameters()|tojson|safe) if scanner else '{}' }};
+
+// Initialize parameters
+document.addEventListener('DOMContentLoaded', function() {
+    loadParameters(scannerParams);
+});
+
+function showTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active'));
+    event.target.classList.add('tab-active');
+
+    document.getElementById('code-tab').classList.add('hidden');
+    document.getElementById('templates-tab').classList.add('hidden');
+    document.getElementById('help-tab').classList.add('hidden');
+
+    document.getElementById(tab + '-tab').classList.remove('hidden');
+}
+
+function loadParameters(params) {
+    const container = document.getElementById('parameters-list');
+    container.innerHTML = '';
+
+    for (const [key, value] of Object.entries(params)) {
+        addParameterRow(key, value);
+    }
+}
+
+function addParameter() {
+    addParameterRow('', '');
+}
+
+function addParameterRow(key, value) {
+    const container = document.getElementById('parameters-list');
+    const div = document.createElement('div');
+    div.className = 'flex gap-2 mb-2';
+    div.innerHTML = `
+        <input type="text" placeholder="Name" class="input input-bordered input-sm flex-1 param-name" value="${key}">
+        <input type="text" placeholder="Value" class="input input-bordered input-sm flex-1 param-value" value="${value}">
+        <button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+        </button>
+    `;
+    container.appendChild(div);
+}
+
+function getParameters() {
+    const params = {};
+    const names = document.querySelectorAll('.param-name');
+    const values = document.querySelectorAll('.param-value');
+
+    names.forEach((name, i) => {
+        if (name.value) {
+            params[name.value] = values[i].value;
+        }
+    });
+
+    return params;
+}
+
+async function validateCode() {
+    const code = document.getElementById('scanner-code').value;
+    const resultsDiv = document.getElementById('validation-results');
+
+    const result = await FluxScan.validateScannerCode(code);
+
+    resultsDiv.classList.remove('hidden');
+    if (result.is_valid) {
+        resultsDiv.innerHTML = `
+            <div class="alert alert-success">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>Scanner code is valid!</span>
+            </div>
+        `;
+    } else {
+        resultsDiv.innerHTML = `
+            <div class="alert alert-error">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div>
+                    <h3 class="font-bold">Validation Failed</h3>
+                    <div class="text-xs">${result.errors.join('<br>')}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    if (result.warnings && result.warnings.length > 0) {
+        resultsDiv.innerHTML += `
+            <div class="alert alert-warning mt-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <div>
+                    <h3 class="font-bold">Warnings</h3>
+                    <div class="text-xs">${result.warnings.join('<br>')}</div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+async function testScanner() {
+    const symbols = document.getElementById('test-symbols').value.split(',').map(s => s.trim());
+    const code = document.getElementById('scanner-code').value;
+    const parameters = getParameters();
+    const resultsDiv = document.getElementById('test-results');
+
+    resultsDiv.classList.remove('hidden');
+    resultsDiv.innerHTML = '<span class="loading loading-spinner loading-md"></span> Running test...';
+
+    try {
+        const response = await fetch('/scanners/api/scanners/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                code: code,
+                symbols: symbols,
+                parameters: parameters
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'completed') {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <span>Test completed: ${result.results.length} signals found</span>
+                </div>
+                ${result.results.length > 0 ? `
+                    <div class="overflow-x-auto mt-2">
+                        <table class="table table-xs">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Signal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${result.results.map(r => `
+                                    <tr>
+                                        <td>${r.symbol}</td>
+                                        <td><span class="badge badge-sm">${r.signal}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : ''}
+            `;
+        } else {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-error">
+                    <span>Test failed: ${result.error || 'Unknown error'}</span>
+                </div>
+            `;
+        }
+    } catch (error) {
+        resultsDiv.innerHTML = `
+            <div class="alert alert-error">
+                <span>Test failed: ${error.message}</span>
+            </div>
+        `;
+    }
+}
+
+async function saveScanner() {
+    const name = document.getElementById('scanner-name').value;
+    const description = document.getElementById('scanner-description').value;
+    const category = document.getElementById('scanner-category').value;
+    const code = document.getElementById('scanner-code').value;
+    const isActive = document.getElementById('scanner-active').checked;
+    const parameters = getParameters();
+
+    if (!name || !code) {
+        FluxScan.showToast('Name and code are required', 'error');
+        return;
+    }
+
+    const data = {
+        name: name,
+        description: description,
+        category: category,
+        code: code,
+        is_active: isActive,
+        parameters: parameters
+    };
+
+    try {
+        const url = scannerId
+            ? `/scanners/api/scanners/${scannerId}`
+            : '/scanners/api/scanners';
+        const method = scannerId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            FluxScan.showToast('Scanner saved successfully', 'success');
+            setTimeout(() => {
+                window.location.href = '{{ url_for("scanners.list_scanners") }}';
+            }, 1000);
+        } else {
+            const error = await response.json();
+            FluxScan.showToast(error.error || 'Failed to save scanner', 'error');
+        }
+    } catch (error) {
+        FluxScan.showToast('Failed to save scanner', 'error');
+    }
+}
+
+function formatCode() {
+    // Simple code formatting (in production, use a proper formatter)
+    const codeArea = document.getElementById('scanner-code');
+    codeArea.value = codeArea.value.trim();
+}
+
+function loadTemplate(templateId) {
+    // In a real implementation, fetch template details and load into editor
+    FluxScan.showToast('Loading template...', 'info');
+}
+</script>
+{% endblock %}

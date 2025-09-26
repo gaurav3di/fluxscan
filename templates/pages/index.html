@@ -1,0 +1,226 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Dashboard - FluxScan{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Quick Actions -->
+    <div class="flex flex-wrap gap-2">
+        <button class="btn btn-primary" onclick="quickScanModal.showModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+            </svg>
+            Quick Scan
+        </button>
+        <a href="{{ url_for('scanners.new_scanner') }}" class="btn btn-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+            </svg>
+            New Scanner
+        </a>
+        <button class="btn btn-accent" onclick="importWatchlistModal.showModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-9.707a1 1 0 011.414 0L9 8.586V3a1 1 0 112 0v5.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+            Import Watchlist
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats shadow w-full">
+        <div class="stat">
+            <div class="stat-figure text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            </div>
+            <div class="stat-title">Active Scanners</div>
+            <div class="stat-value text-primary">{{ active_scanners }}</div>
+            <div class="stat-desc">{{ running_scans|length }} running now</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-figure text-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+            </div>
+            <div class="stat-title">Watchlists</div>
+            <div class="stat-value text-secondary">{{ total_watchlists }}</div>
+            <div class="stat-desc">{{ total_symbols }} total symbols</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-figure text-accent">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+            </div>
+            <div class="stat-title">Today's Signals</div>
+            <div class="stat-value text-accent">{{ today_signals }}</div>
+            <div class="stat-desc">
+                {% if today_signals > yesterday_signals %}
+                    ↗︎ {{ today_signals - yesterday_signals }} more than yesterday
+                {% elif today_signals < yesterday_signals %}
+                    ↘︎ {{ yesterday_signals - today_signals }} less than yesterday
+                {% else %}
+                    Same as yesterday
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Signals -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">Recent Signals</h2>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th>Signal</th>
+                            <th>Scanner</th>
+                            <th>Metrics</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in recent_results %}
+                        <tr>
+                            <td>{{ result.timestamp.strftime('%H:%M:%S') }}</td>
+                            <td class="font-bold">{{ result.symbol }}</td>
+                            <td>
+                                <span class="badge {% if result.signal == 'BUY' %}badge-success{% elif result.signal == 'SELL' %}badge-error{% else %}badge-warning{% endif %}">
+                                    {{ result.signal }}
+                                </span>
+                            </td>
+                            <td>{{ result.scanner.name if result.scanner else 'N/A' }}</td>
+                            <td>
+                                <button class="btn btn-ghost btn-xs" onclick="showMetrics('{{ result.get_metrics()|tojson|e }}')">View</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center">No recent signals</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Running Scans -->
+    {% if running_scans %}
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">Active Scans</h2>
+            <div class="space-y-2">
+                {% for scan in running_scans %}
+                <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                    <div>
+                        <p class="font-semibold">{{ scan.scanner.name if scan.scanner else 'Unknown' }}</p>
+                        <p class="text-sm opacity-70">Started {{ scan.started_at.strftime('%H:%M:%S') if scan.started_at else 'N/A' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="loading loading-spinner loading-sm"></span>
+                        <span class="badge badge-info">Running</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Quick Scan Modal -->
+<dialog id="quickScanModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Quick Scan</h3>
+        <div class="py-4">
+            <div class="form-control w-full">
+                <label class="label">
+                    <span class="label-text">Select Scanner</span>
+                </label>
+                <select class="select select-bordered w-full">
+                    <option disabled selected>Choose a scanner</option>
+                    <option>MACD Crossover</option>
+                    <option>RSI Oversold</option>
+                    <option>Bollinger Band Squeeze</option>
+                </select>
+            </div>
+            <div class="form-control w-full mt-4">
+                <label class="label">
+                    <span class="label-text">Select Watchlist</span>
+                </label>
+                <select class="select select-bordered w-full">
+                    <option disabled selected>Choose a watchlist</option>
+                    <option>NIFTY 50</option>
+                    <option>My Watchlist</option>
+                    <option>High Volume Stocks</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn">Cancel</button>
+            </form>
+            <button class="btn btn-primary">Start Scan</button>
+        </div>
+    </div>
+</dialog>
+
+<!-- Import Watchlist Modal -->
+<dialog id="importWatchlistModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Import Watchlist</h3>
+        <div class="py-4">
+            <div class="form-control w-full">
+                <label class="label">
+                    <span class="label-text">Watchlist Name</span>
+                </label>
+                <input type="text" placeholder="Enter name" class="input input-bordered w-full" />
+            </div>
+            <div class="form-control w-full mt-4">
+                <label class="label">
+                    <span class="label-text">Upload CSV/TXT File</span>
+                </label>
+                <input type="file" class="file-input file-input-bordered w-full" accept=".csv,.txt" />
+            </div>
+            <div class="divider">OR</div>
+            <div class="form-control w-full">
+                <label class="label">
+                    <span class="label-text">Select Predefined List</span>
+                </label>
+                <select class="select select-bordered w-full">
+                    <option disabled selected>Choose a predefined list</option>
+                    <option>NIFTY 50</option>
+                    <option>NIFTY 100</option>
+                    <option>NIFTY Bank</option>
+                    <option>NIFTY IT</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn">Cancel</button>
+            </form>
+            <button class="btn btn-primary">Import</button>
+        </div>
+    </div>
+</dialog>
+
+<script>
+function showMetrics(metricsJson) {
+    try {
+        const metrics = JSON.parse(metricsJson);
+        console.log('Metrics:', metrics);
+        // TODO: Display metrics in a modal
+    } catch (e) {
+        console.error('Failed to parse metrics:', e);
+    }
+}
+</script>
+{% endblock %}

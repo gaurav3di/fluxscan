@@ -1,0 +1,512 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Execute Scan - FluxScan{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Execute Scan</h1>
+        <a href="{{ url_for('scanners.list_scanners') }}" class="btn btn-ghost">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+            </svg>
+            Back
+        </a>
+    </div>
+
+    <!-- Scan Configuration -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Configuration -->
+        <div class="lg:col-span-2">
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Scan Configuration</h2>
+
+                    <!-- Scanner Selection -->
+                    <div class="form-control w-full">
+                        <label class="label">
+                            <span class="label-text">Select Scanner</span>
+                            <span class="label-text-alt text-error">*</span>
+                        </label>
+                        <select id="scanner-select" class="select select-bordered" onchange="loadScannerDetails()">
+                            <option disabled selected>Choose a scanner</option>
+                            {% for scanner in scanners %}
+                            <option value="{{ scanner.id }}" data-params='{{ scanner.get_parameters()|tojson }}'>
+                                {{ scanner.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Watchlist Selection -->
+                    <div class="form-control w-full mt-4">
+                        <label class="label">
+                            <span class="label-text">Select Watchlist</span>
+                            <span class="label-text-alt text-error">*</span>
+                        </label>
+                        <select id="watchlist-select" class="select select-bordered" onchange="updateSymbolCount()">
+                            <option disabled selected>Choose a watchlist</option>
+                            {% for watchlist in watchlists %}
+                            <option value="{{ watchlist.id }}" data-count="{{ watchlist.symbol_count() }}">
+                                {{ watchlist.name }} ({{ watchlist.symbol_count() }} symbols)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Exchange Selection -->
+                    <div class="form-control w-full mt-4">
+                        <label class="label">
+                            <span class="label-text">Exchange</span>
+                            <span class="label-text-alt">Default exchange for scanning</span>
+                        </label>
+                        <select id="exchange-select" class="select select-bordered">
+                            <option value="NSE" selected>NSE - National Stock Exchange</option>
+                            <option value="BSE">BSE - Bombay Stock Exchange</option>
+                            <option value="NFO">NFO - NSE Futures & Options</option>
+                            <option value="BFO">BFO - BSE Futures & Options</option>
+                            <option value="CDS">CDS - Currency Derivatives</option>
+                            <option value="BCD">BCD - BSE Currency Derivatives</option>
+                            <option value="MCX">MCX - Multi Commodity Exchange</option>
+                        </select>
+                    </div>
+
+                    <!-- Timeframe Selection -->
+                    <div class="form-control w-full mt-4">
+                        <label class="label">
+                            <span class="label-text">Timeframe / Interval</span>
+                            <span class="label-text-alt">Historical data interval for scanning</span>
+                        </label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <!-- Intraday Timeframes -->
+                            <label class="label cursor-pointer">
+                                <input type="radio" name="interval" value="1m" class="radio radio-primary" />
+                                <span class="label-text ml-2">1m</span>
+                            </label>
+                            <label class="label cursor-pointer">
+                                <input type="radio" name="interval" value="3m" class="radio radio-primary" />
+                                <span class="label-text ml-2">3m</span>
+                            </label>
+                            <label class="label cursor-pointer">
+                                <input type="radio" name="interval" value="5m" class="radio radio-primary" checked />
+                                <span class="label-text ml-2">5m</span>
+                            </label>
+                            <label class="label cursor-pointer">
+                                <input type="radio" name="interval" value="10m" class="radio radio-primary" />
+                                <span class="label-text ml-2">10m</span>
+                            </label>
+                            <label class="label cursor-pointer">
+                                <input type="radio" name="interval" value="15m" class="radio radio-primary" />
+                                <span class="label-text ml-2">15m</span>
+                            </label>
+                            <label class="label cursor-pointer">
+                                <input type="radio" name="interval" value="30m" class="radio radio-primary" />
+                                <span class="label-text ml-2">30m</span>
+                            </label>
+                            <label class="label cursor-pointer">
+                                <input type="radio" name="interval" value="1h" class="radio radio-primary" />
+                                <span class="label-text ml-2">1h</span>
+                            </label>
+                            <label class="label cursor-pointer">
+                                <input type="radio" name="interval" value="D" class="radio radio-primary" />
+                                <span class="label-text ml-2">Daily</span>
+                            </label>
+                        </div>
+                        <div class="label">
+                            <span class="label-text-alt">Minutes: 1m, 3m, 5m, 10m, 15m, 30m | Hours: 1h | Days: D</span>
+                        </div>
+                    </div>
+
+                    <!-- Lookback Period -->
+                    <div class="form-control w-full mt-4">
+                        <label class="label">
+                            <span class="label-text">Lookback Period (days)</span>
+                            <span class="label-text-alt">Historical data to fetch</span>
+                        </label>
+                        <input type="number" id="lookback-days" class="input input-bordered" value="30" min="1" max="365" />
+                        <div class="label">
+                            <span class="label-text-alt" id="data-points-info">Approximately 30 days of data</span>
+                        </div>
+                    </div>
+
+                    <!-- Scanner Parameters -->
+                    <div class="divider">Scanner Parameters</div>
+                    <div id="scanner-params" class="space-y-2">
+                        <p class="text-sm opacity-70">Select a scanner to configure parameters</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Execution Panel -->
+        <div>
+            <!-- Quick Settings -->
+            <div class="card bg-base-100 shadow-xl mb-6">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Quick Settings</h2>
+
+                    <!-- Preset Timeframes -->
+                    <div class="btn-group btn-group-vertical w-full">
+                        <button class="btn btn-sm" onclick="setQuickTimeframe('1m', 1)">Scalping (1m, 1 day)</button>
+                        <button class="btn btn-sm" onclick="setQuickTimeframe('5m', 5)">Intraday (5m, 5 days)</button>
+                        <button class="btn btn-sm" onclick="setQuickTimeframe('15m', 10)">Short-term (15m, 10 days)</button>
+                        <button class="btn btn-sm" onclick="setQuickTimeframe('1h', 30)">Swing (1h, 30 days)</button>
+                        <button class="btn btn-sm btn-active" onclick="setQuickTimeframe('D', 100)">Position (Daily, 100 days)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Execution Status -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Execution</h2>
+
+                    <div class="stat">
+                        <div class="stat-title">Selected Symbols</div>
+                        <div class="stat-value text-2xl" id="symbol-count">0</div>
+                        <div class="stat-desc">Ready to scan</div>
+                    </div>
+
+                    <button id="run-scan-btn" class="btn btn-primary w-full mt-4" onclick="executeScan()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                        </svg>
+                        Run Scan
+                    </button>
+
+                    <!-- Progress -->
+                    <div id="scan-progress" class="hidden mt-4">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm">Scanning...</span>
+                            <span class="text-sm" id="progress-text">0%</span>
+                        </div>
+                        <progress class="progress progress-primary w-full" id="progress-bar" value="0" max="100"></progress>
+                        <div class="text-xs mt-1" id="current-symbol">Initializing...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" class="hidden mt-6">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="card-title">Scan Results</h2>
+                    <div class="flex gap-2">
+                        <button class="btn btn-sm btn-ghost" onclick="exportResults()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                            Export
+                        </button>
+                        <button class="btn btn-sm btn-ghost" onclick="clearResults()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Signal</th>
+                                <th>Price</th>
+                                <th>Strength</th>
+                                <th>Metrics</th>
+                                <th>Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-tbody">
+                            <!-- Results will be added here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="no-results" class="text-center py-8 hidden">
+                    <p class="text-lg opacity-70">No signals found</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentScanId = null;
+let scannerParams = {};
+
+function loadScannerDetails() {
+    const select = document.getElementById('scanner-select');
+    const selectedOption = select.options[select.selectedIndex];
+
+    if (selectedOption.value) {
+        const params = JSON.parse(selectedOption.dataset.params || '{}');
+        scannerParams = params;
+        renderScannerParams(params);
+    }
+}
+
+function renderScannerParams(params) {
+    const container = document.getElementById('scanner-params');
+
+    if (Object.keys(params).length === 0) {
+        container.innerHTML = '<p class="text-sm opacity-70">No configurable parameters</p>';
+        return;
+    }
+
+    let html = '';
+    for (const [key, value] of Object.entries(params)) {
+        const displayName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        html += `
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">${displayName}</span>
+                </label>
+                <input type="text" id="param-${key}" class="input input-bordered input-sm" value="${value}" />
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+function updateSymbolCount() {
+    const select = document.getElementById('watchlist-select');
+    const selectedOption = select.options[select.selectedIndex];
+
+    if (selectedOption.value) {
+        const count = selectedOption.dataset.count || '0';
+        document.getElementById('symbol-count').textContent = count;
+    }
+}
+
+function setQuickTimeframe(interval, days) {
+    // Set interval radio button
+    document.querySelector(`input[name="interval"][value="${interval}"]`).checked = true;
+
+    // Set lookback days
+    document.getElementById('lookback-days').value = days;
+
+    // Update info text
+    updateDataPointsInfo(interval, days);
+}
+
+function updateDataPointsInfo(interval, days) {
+    const info = document.getElementById('data-points-info');
+    let dataPoints = 0;
+
+    // Calculate approximate data points based on interval
+    switch(interval) {
+        case '1m':
+            dataPoints = days * 375; // ~375 minutes of trading per day
+            break;
+        case '3m':
+            dataPoints = days * 125;
+            break;
+        case '5m':
+            dataPoints = days * 75;
+            break;
+        case '10m':
+            dataPoints = days * 38;
+            break;
+        case '15m':
+            dataPoints = days * 25;
+            break;
+        case '30m':
+            dataPoints = days * 13;
+            break;
+        case '1h':
+            dataPoints = days * 7;
+            break;
+        case 'D':
+            dataPoints = days;
+            break;
+    }
+
+    info.textContent = `Approximately ${dataPoints} data points (${days} days)`;
+}
+
+// Update info when lookback changes
+document.getElementById('lookback-days')?.addEventListener('input', function() {
+    const interval = document.querySelector('input[name="interval"]:checked').value;
+    updateDataPointsInfo(interval, this.value);
+});
+
+// Update info when interval changes
+document.querySelectorAll('input[name="interval"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const days = document.getElementById('lookback-days').value;
+        updateDataPointsInfo(this.value, days);
+    });
+});
+
+async function executeScan() {
+    const scannerId = document.getElementById('scanner-select').value;
+    const watchlistId = document.getElementById('watchlist-select').value;
+    const exchange = document.getElementById('exchange-select').value;
+    const interval = document.querySelector('input[name="interval"]:checked').value;
+    const lookbackDays = document.getElementById('lookback-days').value;
+
+    if (!scannerId || !watchlistId) {
+        FluxScan.showToast('Please select both scanner and watchlist', 'error');
+        return;
+    }
+
+    // Get updated parameters
+    const params = {};
+    for (const key of Object.keys(scannerParams)) {
+        const input = document.getElementById(`param-${key}`);
+        if (input) {
+            params[key] = input.value;
+        }
+    }
+
+    // Add scan configuration to params
+    params.exchange = exchange;
+    params.interval = interval;
+    params.lookback_days = parseInt(lookbackDays);
+
+    // Show progress
+    document.getElementById('scan-progress').classList.remove('hidden');
+    document.getElementById('run-scan-btn').disabled = true;
+    document.getElementById('progress-bar').value = 0;
+    document.getElementById('current-symbol').textContent = 'Starting scan...';
+
+    try {
+        const response = await fetch('/scanners/api/scan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                scanner_id: parseInt(scannerId),
+                watchlist_id: parseInt(watchlistId),
+                parameters: params
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            currentScanId = result.scan_id;
+
+            // Start polling for progress
+            pollScanProgress(currentScanId);
+        } else {
+            FluxScan.showToast(result.error || 'Failed to start scan', 'error');
+            resetScanUI();
+        }
+    } catch (error) {
+        FluxScan.showToast('Failed to execute scan', 'error');
+        resetScanUI();
+    }
+}
+
+async function pollScanProgress(scanId) {
+    try {
+        const response = await fetch(`/scanners/api/scan/${scanId}/status`);
+        const status = await response.json();
+
+        // Update progress
+        document.getElementById('progress-bar').value = status.progress;
+        document.getElementById('progress-text').textContent = `${status.progress}%`;
+        document.getElementById('current-symbol').textContent = status.current_symbol || 'Processing...';
+
+        if (status.status === 'completed' || status.status === 'failed') {
+            // Scan finished
+            displayResults(status.results || []);
+            resetScanUI();
+
+            if (status.status === 'completed') {
+                FluxScan.showToast(`Scan completed! Found ${status.results.length} signals`, 'success');
+            } else {
+                FluxScan.showToast('Scan failed', 'error');
+            }
+        } else {
+            // Continue polling
+            setTimeout(() => pollScanProgress(scanId), 1000);
+        }
+    } catch (error) {
+        console.error('Polling error:', error);
+        resetScanUI();
+    }
+}
+
+function displayResults(results) {
+    const tbody = document.getElementById('results-tbody');
+    const noResults = document.getElementById('no-results');
+    const resultsSection = document.getElementById('results-section');
+
+    resultsSection.classList.remove('hidden');
+
+    if (results.length === 0) {
+        tbody.innerHTML = '';
+        noResults.classList.remove('hidden');
+        return;
+    }
+
+    noResults.classList.add('hidden');
+
+    tbody.innerHTML = results.map(r => `
+        <tr>
+            <td class="font-bold">${r.symbol}</td>
+            <td>
+                <span class="badge ${r.signal === 'BUY' ? 'badge-success' : r.signal === 'SELL' ? 'badge-error' : 'badge-warning'}">
+                    ${r.signal}
+                </span>
+            </td>
+            <td>${r.metrics?.price?.toFixed(2) || 'N/A'}</td>
+            <td>
+                <progress class="progress progress-primary w-20" value="${r.metrics?.signal_strength || 50}" max="100"></progress>
+            </td>
+            <td>
+                <button class="btn btn-ghost btn-xs" onclick='viewMetrics(${JSON.stringify(r.metrics)})'>View</button>
+            </td>
+            <td>${new Date(r.timestamp).toLocaleTimeString()}</td>
+            <td>
+                <button class="btn btn-ghost btn-xs" onclick="openChart('${r.symbol}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                    </svg>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function resetScanUI() {
+    document.getElementById('scan-progress').classList.add('hidden');
+    document.getElementById('run-scan-btn').disabled = false;
+}
+
+function viewMetrics(metrics) {
+    // You can create a modal to show metrics
+    console.log('Metrics:', metrics);
+    FluxScan.showToast('Metrics: ' + JSON.stringify(metrics), 'info');
+}
+
+function openChart(symbol) {
+    const exchange = document.getElementById('exchange-select').value;
+    window.open(`https://www.tradingview.com/chart/?symbol=${exchange}:${symbol}`, '_blank');
+}
+
+function exportResults() {
+    // Export results to CSV
+    FluxScan.showToast('Exporting results...', 'info');
+}
+
+function clearResults() {
+    document.getElementById('results-section').classList.add('hidden');
+    document.getElementById('results-tbody').innerHTML = '';
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+    updateDataPointsInfo('5m', 30);
+});
+</script>
+{% endblock %}

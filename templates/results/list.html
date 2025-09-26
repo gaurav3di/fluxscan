@@ -1,0 +1,224 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Scan Results - FluxScan{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Scan Results</h1>
+        <div class="flex gap-2">
+            <button class="btn btn-ghost" onclick="location.reload()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                </svg>
+                Refresh
+            </button>
+            <button class="btn btn-primary" onclick="exportResults()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+                Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card bg-base-100 shadow mb-6">
+        <div class="card-body py-4">
+            <div class="flex flex-wrap gap-4">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Signal Type</span>
+                    </label>
+                    <select id="filter-signal" class="select select-bordered select-sm" onchange="filterResults()">
+                        <option value="">All Signals</option>
+                        {% for signal in signal_types %}
+                        <option value="{{ signal }}">{{ signal }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Symbol</span>
+                    </label>
+                    <input type="text" id="filter-symbol" placeholder="Enter symbol" class="input input-bordered input-sm" onkeyup="filterResults()" />
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Date Range</span>
+                    </label>
+                    <input type="date" id="filter-date" class="input input-bordered input-sm" onchange="filterResults()" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Table -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th>Signal</th>
+                            <th>Scanner</th>
+                            <th>Price</th>
+                            <th>Strength</th>
+                            <th>Metrics</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-tbody">
+                        {% for result in results %}
+                        <tr data-symbol="{{ result.symbol }}" data-signal="{{ result.signal }}">
+                            <td>{{ result.timestamp.strftime('%Y-%m-%d %H:%M') if result.timestamp else 'N/A' }}</td>
+                            <td class="font-bold">{{ result.symbol }}</td>
+                            <td>
+                                <span class="badge {% if result.signal == 'BUY' %}badge-success{% elif result.signal == 'SELL' %}badge-error{% else %}badge-warning{% endif %}">
+                                    {{ result.signal }}
+                                </span>
+                            </td>
+                            <td>{{ result.scanner.name if result.scanner else 'N/A' }}</td>
+                            <td>{{ result.get_metrics().get('price', 'N/A') }}</td>
+                            <td>
+                                {% set strength = result.get_metrics().get('signal_strength', 0) %}
+                                <progress class="progress {% if strength > 70 %}progress-success{% elif strength > 40 %}progress-warning{% else %}progress-error{% endif %} w-20" value="{{ strength }}" max="100"></progress>
+                            </td>
+                            <td>
+                                <button class="btn btn-ghost btn-xs" onclick='showMetrics({{ result.get_metrics()|tojson }})'>View</button>
+                            </td>
+                            <td>
+                                <div class="flex gap-1">
+                                    <button class="btn btn-ghost btn-xs" onclick="chartSymbol('{{ result.symbol }}')">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                                        </svg>
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs" onclick="deleteResult({{ result.id }})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center">No results found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics Modal -->
+<dialog id="metricsModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Signal Metrics</h3>
+        <div id="metrics-content"></div>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn">Close</button>
+            </form>
+        </div>
+    </div>
+</dialog>
+
+<script>
+function filterResults() {
+    const signalFilter = document.getElementById('filter-signal').value.toLowerCase();
+    const symbolFilter = document.getElementById('filter-symbol').value.toUpperCase();
+
+    const rows = document.querySelectorAll('#results-tbody tr');
+
+    rows.forEach(row => {
+        const symbol = row.dataset.symbol;
+        const signal = row.dataset.signal;
+
+        let show = true;
+
+        if (signalFilter && signal && signal.toLowerCase() !== signalFilter) {
+            show = false;
+        }
+
+        if (symbolFilter && symbol && !symbol.includes(symbolFilter)) {
+            show = false;
+        }
+
+        row.style.display = show ? '' : 'none';
+    });
+}
+
+function showMetrics(metrics) {
+    const content = document.getElementById('metrics-content');
+    let html = '<div class="space-y-2">';
+
+    for (const [key, value] of Object.entries(metrics)) {
+        html += `
+            <div class="flex justify-between">
+                <span class="font-medium">${key.replace('_', ' ').toUpperCase()}:</span>
+                <span class="badge badge-primary">${value}</span>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    content.innerHTML = html;
+    metricsModal.showModal();
+}
+
+async function exportResults() {
+    try {
+        const response = await fetch('/results/api/results/export', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({format: 'csv'})
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `scan_results_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        FluxScan.showToast('Export failed', 'error');
+    }
+}
+
+async function deleteResult(id) {
+    if (!confirm('Are you sure you want to delete this result?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/results/api/results/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            FluxScan.showToast('Result deleted', 'success');
+            location.reload();
+        }
+    } catch (error) {
+        FluxScan.showToast('Failed to delete result', 'error');
+    }
+}
+
+function chartSymbol(symbol) {
+    // Open in TradingView or other charting service
+    window.open(`https://www.tradingview.com/chart/?symbol=NSE:${symbol}`, '_blank');
+}
+</script>
+{% endblock %}

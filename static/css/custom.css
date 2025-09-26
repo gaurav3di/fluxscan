@@ -1,0 +1,121 @@
+/* FluxScan Custom Styles */
+
+/* Scanner code editor */
+.textarea.font-mono {
+    font-family: 'Courier New', Courier, monospace;
+    line-height: 1.5;
+}
+
+/* Smooth transitions */
+.scanner-card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.scanner-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Loading animation */
+@keyframes pulse-opacity {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.loading-pulse {
+    animation: pulse-opacity 2s ease-in-out infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Progress bar animation */
+.progress-bar-animated {
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, .15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, .15) 50%,
+        rgba(255, 255, 255, .15) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 1rem 1rem;
+    animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 1rem 0;
+    }
+}
+
+/* Toast animations */
+.toast {
+    animation: slide-in 0.3s ease-out;
+}
+
+@keyframes slide-in {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Modal backdrop blur */
+.modal::backdrop {
+    backdrop-filter: blur(4px);
+}
+
+/* Responsive tables */
+@media (max-width: 768px) {
+    .table {
+        font-size: 0.875rem;
+    }
+
+    .stats {
+        grid-auto-flow: row;
+    }
+}
+
+/* Print styles */
+@media print {
+    .navbar,
+    .footer,
+    .btn,
+    .modal {
+        display: none !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #ddd;
+    }
+}

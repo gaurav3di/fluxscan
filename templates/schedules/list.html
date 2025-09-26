@@ -1,0 +1,321 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Schedules - FluxScan{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Scan Schedules</h1>
+        <button class="btn btn-primary" onclick="newScheduleModal.showModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+            </svg>
+            New Schedule
+        </button>
+    </div>
+
+    <!-- Schedules Table -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Scanner</th>
+                            <th>Watchlist</th>
+                            <th>Type</th>
+                            <th>Schedule</th>
+                            <th>Last Run</th>
+                            <th>Next Run</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for schedule in schedules %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="toggle toggle-success toggle-sm"
+                                       {% if schedule.is_active %}checked{% endif %}
+                                       onchange="toggleSchedule({{ schedule.id }})" />
+                            </td>
+                            <td>{{ schedule.scanner.name if schedule.scanner else 'N/A' }}</td>
+                            <td>{{ schedule.watchlist.name if schedule.watchlist else 'N/A' }}</td>
+                            <td>
+                                <span class="badge badge-outline">{{ schedule.schedule_type|title }}</span>
+                            </td>
+                            <td>
+                                {% if schedule.schedule_type == 'interval' %}
+                                    Every {{ schedule.interval_minutes }} minutes
+                                {% elif schedule.schedule_type == 'daily' %}
+                                    Daily at {{ schedule.run_time.strftime('%H:%M') if schedule.run_time else 'N/A' }}
+                                {% elif schedule.schedule_type == 'weekly' %}
+                                    Weekly on {{ schedule.days_of_week }}
+                                {% else %}
+                                    {{ schedule.schedule_type }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if schedule.last_run %}
+                                    {{ schedule.last_run.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if schedule.next_run %}
+                                    {{ schedule.next_run.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="flex gap-1">
+                                    <button class="btn btn-ghost btn-xs" onclick="viewHistory({{ schedule.id }})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs" onclick="runNow({{ schedule.id }})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    <button class="btn btn-error btn-xs" onclick="deleteSchedule({{ schedule.id }})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center">No schedules found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Schedule Modal -->
+<dialog id="newScheduleModal" class="modal">
+    <div class="modal-box w-11/12 max-w-2xl">
+        <h3 class="font-bold text-lg">Create New Schedule</h3>
+        <div class="py-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text">Scanner</span>
+                    </label>
+                    <select id="schedule-scanner" class="select select-bordered">
+                        <option disabled selected>Choose scanner</option>
+                        {% for scanner in scanners %}
+                        <option value="{{ scanner.id }}">{{ scanner.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text">Watchlist</span>
+                    </label>
+                    <select id="schedule-watchlist" class="select select-bordered">
+                        <option disabled selected>Choose watchlist</option>
+                        {% for watchlist in watchlists %}
+                        <option value="{{ watchlist.id }}">{{ watchlist.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-control w-full mt-4">
+                <label class="label">
+                    <span class="label-text">Schedule Type</span>
+                </label>
+                <select id="schedule-type" class="select select-bordered" onchange="updateScheduleOptions()">
+                    <option value="once">Run Once</option>
+                    <option value="interval">Interval</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                </select>
+            </div>
+
+            <div id="interval-options" class="hidden mt-4">
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text">Run every (minutes)</span>
+                    </label>
+                    <input type="number" id="interval-minutes" placeholder="60" class="input input-bordered" min="5" value="60" />
+                </div>
+            </div>
+
+            <div id="time-options" class="hidden mt-4">
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text">Run at time</span>
+                    </label>
+                    <input type="time" id="run-time" class="input input-bordered" value="09:30" />
+                </div>
+            </div>
+
+            <div id="weekly-options" class="hidden mt-4">
+                <label class="label">
+                    <span class="label-text">Days of week</span>
+                </label>
+                <div class="flex gap-2">
+                    <label class="label cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-sm" value="0" />
+                        <span class="label-text ml-2">Mon</span>
+                    </label>
+                    <label class="label cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-sm" value="1" />
+                        <span class="label-text ml-2">Tue</span>
+                    </label>
+                    <label class="label cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-sm" value="2" />
+                        <span class="label-text ml-2">Wed</span>
+                    </label>
+                    <label class="label cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-sm" value="3" />
+                        <span class="label-text ml-2">Thu</span>
+                    </label>
+                    <label class="label cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-sm" value="4" />
+                        <span class="label-text ml-2">Fri</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-control mt-4">
+                <label class="label cursor-pointer">
+                    <span class="label-text">Market hours only</span>
+                    <input type="checkbox" id="market-hours-only" class="checkbox" checked />
+                </label>
+            </div>
+        </div>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn">Cancel</button>
+            </form>
+            <button class="btn btn-primary" onclick="createSchedule()">Create Schedule</button>
+        </div>
+    </div>
+</dialog>
+
+<script>
+function updateScheduleOptions() {
+    const scheduleType = document.getElementById('schedule-type').value;
+
+    document.getElementById('interval-options').classList.add('hidden');
+    document.getElementById('time-options').classList.add('hidden');
+    document.getElementById('weekly-options').classList.add('hidden');
+
+    if (scheduleType === 'interval') {
+        document.getElementById('interval-options').classList.remove('hidden');
+    } else if (scheduleType === 'daily') {
+        document.getElementById('time-options').classList.remove('hidden');
+    } else if (scheduleType === 'weekly') {
+        document.getElementById('time-options').classList.remove('hidden');
+        document.getElementById('weekly-options').classList.remove('hidden');
+    }
+}
+
+async function createSchedule() {
+    const scannerId = document.getElementById('schedule-scanner').value;
+    const watchlistId = document.getElementById('schedule-watchlist').value;
+    const scheduleType = document.getElementById('schedule-type').value;
+    const marketHoursOnly = document.getElementById('market-hours-only').checked;
+
+    if (!scannerId || !watchlistId) {
+        FluxScan.showToast('Please select scanner and watchlist', 'error');
+        return;
+    }
+
+    const data = {
+        scanner_id: parseInt(scannerId),
+        watchlist_id: parseInt(watchlistId),
+        schedule_type: scheduleType,
+        market_hours_only: marketHoursOnly
+    };
+
+    if (scheduleType === 'interval') {
+        data.interval_minutes = parseInt(document.getElementById('interval-minutes').value);
+    } else if (scheduleType === 'daily' || scheduleType === 'weekly') {
+        data.run_time = document.getElementById('run-time').value;
+    }
+
+    if (scheduleType === 'weekly') {
+        const checkboxes = document.querySelectorAll('#weekly-options input[type="checkbox"]:checked');
+        const days = Array.from(checkboxes).map(cb => cb.value);
+        data.days_of_week = days.join(',');
+    }
+
+    try {
+        const response = await fetch('/schedules/api/schedules', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            FluxScan.showToast('Schedule created successfully', 'success');
+            newScheduleModal.close();
+            location.reload();
+        } else {
+            const error = await response.json();
+            FluxScan.showToast(error.error || 'Failed to create schedule', 'error');
+        }
+    } catch (error) {
+        FluxScan.showToast('Failed to create schedule', 'error');
+    }
+}
+
+async function toggleSchedule(id) {
+    try {
+        const response = await fetch(`/schedules/api/schedules/${id}/toggle`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            FluxScan.showToast(`Schedule ${result.is_active ? 'activated' : 'deactivated'}`, 'success');
+        }
+    } catch (error) {
+        FluxScan.showToast('Failed to toggle schedule', 'error');
+    }
+}
+
+async function deleteSchedule(id) {
+    if (!confirm('Are you sure you want to delete this schedule?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/schedules/api/schedules/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            FluxScan.showToast('Schedule deleted successfully', 'success');
+            location.reload();
+        }
+    } catch (error) {
+        FluxScan.showToast('Failed to delete schedule', 'error');
+    }
+}
+
+function viewHistory(id) {
+    FluxScan.showToast('History view coming soon', 'info');
+}
+
+function runNow(id) {
+    FluxScan.showToast('Running scheduled scan...', 'info');
+    // Implementation needed
+}
+</script>
+{% endblock %}

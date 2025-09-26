@@ -1,0 +1,29 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Error - FluxScan{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-[60vh]">
+    <div class="text-center">
+        <h1 class="text-6xl font-bold text-error mb-4">Oops!</h1>
+        <h2 class="text-2xl font-semibold mb-4">{{ error or "Something went wrong" }}</h2>
+        <p class="text-lg opacity-70 mb-8">
+            The page you're looking for doesn't exist or an error occurred.
+        </p>
+        <div class="flex gap-4 justify-center">
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                </svg>
+                Go Home
+            </a>
+            <button onclick="window.history.back()" class="btn btn-ghost">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+                Go Back
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

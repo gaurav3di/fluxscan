@@ -1,5 +1,12 @@
 import os
 from datetime import timedelta
+from dotenv import load_dotenv, dotenv_values
+
+# Load .env file with override=True to prioritize .env over system env
+load_dotenv(override=True)
+
+# Also directly load .env values to ensure we get file values
+env_file_values = dotenv_values('.env')
 
 class Config:
     # Flask
@@ -10,9 +17,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///fluxscan.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # OpenAlgo
-    OPENALGO_API_KEY = os.environ.get('OPENALGO_API_KEY')
-    OPENALGO_HOST = os.environ.get('OPENALGO_HOST', 'http://127.0.0.1:5000')
+    # OpenAlgo - PRIORITIZE .env file over system environment
+    OPENALGO_API_KEY = env_file_values.get('OPENALGO_API_KEY') or os.environ.get('OPENALGO_API_KEY')
+    OPENALGO_HOST = env_file_values.get('OPENALGO_HOST') or os.environ.get('OPENALGO_HOST', 'http://127.0.0.1:5000')
 
     # Scanning
     MAX_CONCURRENT_SCANS = int(os.environ.get('MAX_CONCURRENT_SCANS', 10))

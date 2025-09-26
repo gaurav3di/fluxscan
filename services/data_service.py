@@ -4,7 +4,12 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from openalgo import api as openalgo_api
 import httpx
+import logging
 from .cache_service import CacheService
+
+# Configure logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 class DataService:
     def __init__(self, api_key: str, host: str):
@@ -19,10 +24,13 @@ class DataService:
         try:
             self.client = openalgo_api(api_key=self.api_key, host=self.host)
             self.api_valid = None  # Will be checked on first use
+            self.error_shown = False  # Track if error has been shown
+            logger.info(f"OpenAlgo client initialized successfully")
         except Exception as e:
-            print(f"Failed to initialize OpenAlgo client: {e}")
+            logger.error(f"Failed to initialize OpenAlgo client: {e}")
             self.client = None
             self.api_valid = False
+            self.error_shown = False
 
     def get_historical_data(self, symbol: str, exchange: str = 'NSE',
                            interval: str = 'D', lookback_days: int = 100) -> Optional[pd.DataFrame]:
@@ -53,18 +61,22 @@ class DataService:
                     error_msg = response.get('message', 'Unknown error')
                     if 'Invalid openalgo apikey' in error_msg or response.get('code') == 403:
                         self.api_valid = False
-                        print(f"\n" + "=" * 60)
-                        print("OPENALGO API KEY ERROR")
-                        print("=" * 60)
-                        print("The OpenAlgo API key is invalid or not set correctly.")
-                        print("Using dummy data for testing.")
-                        print("\nTo fix this:")
-                        print("1. Get valid API key from OpenAlgo server")
-                        print("2. Update OPENALGO_API_KEY in .env file")
-                        print("3. Restart FluxScan")
-                        print("=" * 60 + "\n")
+                        # Show error only once
+                        if not self.error_shown:
+                            self.error_shown = True
+                            print(f"\n" + "=" * 60)
+                            print("OPENALGO API KEY ERROR")
+                            print("=" * 60)
+                            print("The OpenAlgo API key is invalid or not set correctly.")
+                            print("Using dummy data for testing.")
+                            print("\nTo fix this:")
+                            print("1. Get valid API key from OpenAlgo server")
+                            print("2. Update OPENALGO_API_KEY in .env file")
+                            print("3. Restart FluxScan")
+                            print("=" * 60 + "\n")
                     else:
-                        print(f"OpenAlgo API error: {error_msg}")
+                        if not self.error_shown:
+                            print(f"OpenAlgo API error: {error_msg}")
                 elif isinstance(response, pd.DataFrame) and not response.empty:
                     # Ensure column names are lowercase
                     response.columns = [col.lower() for col in response.columns]
@@ -73,16 +85,29 @@ class DataService:
                     if self.api_valid is None:
                         self.api_valid = True
 
+                    # Log data info (head only)
+                    logger.info(f"\n{'='*60}")
+                    logger.info(f"Historical Data Downloaded: {symbol} ({exchange})")
+                    logger.info(f"Interval: {interval}, Lookback: {lookback_days} days")
+                    logger.info(f"Shape: {response.shape[0]} rows x {response.shape[1]} columns")
+                    logger.info(f"Columns: {list(response.columns)}")
+                    logger.info(f"Date range: {response.index[0]} to {response.index[-1]}")
+                    logger.info(f"\nFirst 5 rows:")
+                    logger.info(f"\n{response.head().to_string()}")
+                    logger.info(f"{'='*60}\n")
+
                     # Cache the data
                     self.cache.set(cache_key, response, ttl=300)  # 5 minutes cache
 
                     return response
 
         except Exception as e:
-            print(f"Error fetching historical data for {symbol}: {e}")
+            logger.error(f"Error fetching historical data for {symbol}: {e}")
 
         # Return dummy data for testing if API fails
-        print(f"Using dummy data for {symbol} ({interval})")
+        # Only show message if not already shown API error
+        if not getattr(self, 'error_shown', False):
+            print(f"Using dummy data for {symbol} ({interval})")
         return self._get_dummy_data(lookback_days)
 
     def get_quote(self, symbol: str, exchange: str = 'NSE') -> Optional[Dict[str, Any]]:

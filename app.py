@@ -2,8 +2,23 @@ from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
+import logging
 from dotenv import load_dotenv
 from datetime import datetime
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Console output
+        logging.FileHandler('fluxscan.log')  # File output
+    ]
+)
+
+# Set specific logger levels
+logging.getLogger('services.data_service').setLevel(logging.INFO)
+logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce Flask request logs
 
 # Load environment variables
 load_dotenv()

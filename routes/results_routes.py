@@ -46,48 +46,61 @@ def list_results():
     for r in results:
         metrics = r.get_metrics() if r.metrics else {}
 
-        # Extract data from metrics - Amibroker format
+        # Build processed result based on signal type
         processed = {
             'symbol': r.symbol,
             'signal': r.signal,
             'timestamp': r.timestamp,
-            # Price data
-            'close_price': float(metrics.get('close_price', metrics.get('price', 0))),
-            'macd': float(metrics.get('macd', 0)),
-            # ATR metrics
-            'short_atr': float(metrics.get('short_atr', 0)),
-            'long_atr': float(metrics.get('long_atr', 0)),
-            'short_atr_pct': float(metrics.get('short_atr_pct', 0)),
-            'long_atr_pct': float(metrics.get('long_atr_pct', 0)),
-            'atr_ratio': float(metrics.get('atr_ratio', 1)),
-            'atr_to_price': float(metrics.get('atr_to_price', 0)),
-            # Trading metrics
-            'entry': float(metrics.get('entry', metrics.get('price', 0))),
-            'target': float(metrics.get('target', 0)),
-            'stop_loss': float(metrics.get('stop_loss', 0)),
-            'risk_reward': float(metrics.get('risk_reward', 0)),
-            # Additional metrics
-            'ema10': float(metrics.get('ema10', 0)),
-            'ema20': float(metrics.get('ema20', 0)),
-            'volume': float(metrics.get('volume', 0)),
-            'strength': 3  # Default strength rating
+            'metrics': metrics  # Keep original metrics
         }
 
-        # Calculate potential gain and risk percentages
-        if processed['entry'] > 0 and processed['target'] > 0:
-            if r.signal == 'BUY':
-                processed['potential_gain'] = ((processed['target'] - processed['entry']) / processed['entry']) * 100
-                processed['risk'] = abs((processed['stop_loss'] - processed['entry']) / processed['entry']) * 100 if processed['stop_loss'] > 0 else 0
-            else:  # SELL
-                processed['potential_gain'] = ((processed['entry'] - processed['target']) / processed['entry']) * 100
-                processed['risk'] = abs((processed['stop_loss'] - processed['entry']) / processed['entry']) * 100 if processed['stop_loss'] > 0 else 0
-        else:
-            processed['potential_gain'] = 0
-            processed['risk'] = 0
-
-        # Calculate signal strength based on risk-reward ratio
+        # Determine scanner type and add appropriate fields
         if r.signal in ['BUY', 'SELL']:
-            rr_ratio = processed['risk_reward']
+            # Trading signal scanner
+            processed.update({
+                'close_price': float(metrics.get('close_price', metrics.get('price', metrics.get('ltp', 0)))),
+                'entry': float(metrics.get('entry', metrics.get('price', 0))),
+                'target': float(metrics.get('target', 0)),
+                'stop_loss': float(metrics.get('stop_loss', 0)),
+                'risk_reward': float(metrics.get('risk_reward', 0)),
+                'ema10': float(metrics.get('ema10', 0)),
+                'ema20': float(metrics.get('ema20', 0)),
+                'volume': float(metrics.get('volume', 0)),
+                'strength': 3
+            })
+        elif r.signal in ['DATA', 'EXPLORE']:
+            # Data exploration scanner
+            processed.update({
+                'ltp': float(metrics.get('ltp', metrics.get('close_price', 0))),
+                'ema10': float(metrics.get('ema10', 0)),
+                'ema20': float(metrics.get('ema20', 0)),
+                'volume': float(metrics.get('volume', 0)),
+                'close_price': float(metrics.get('ltp', metrics.get('close_price', 0)))
+            })
+            # Add any additional metrics dynamically
+            for key, value in metrics.items():
+                if key not in processed:
+                    processed[key] = value
+        else:
+            # Generic scanner - include all metrics
+            processed.update(metrics)
+            processed['close_price'] = float(metrics.get('close_price', metrics.get('price', metrics.get('ltp', 0))))
+
+        # Calculate potential gain and risk percentages ONLY for trading signals
+        if r.signal in ['BUY', 'SELL']:
+            if processed.get('entry', 0) > 0 and processed.get('target', 0) > 0:
+                if r.signal == 'BUY':
+                    processed['potential_gain'] = ((processed['target'] - processed['entry']) / processed['entry']) * 100
+                    processed['risk'] = abs((processed.get('stop_loss', 0) - processed['entry']) / processed['entry']) * 100 if processed.get('stop_loss', 0) > 0 else 0
+                else:  # SELL
+                    processed['potential_gain'] = ((processed['entry'] - processed['target']) / processed['entry']) * 100
+                    processed['risk'] = abs((processed.get('stop_loss', 0) - processed['entry']) / processed['entry']) * 100 if processed.get('stop_loss', 0) > 0 else 0
+            else:
+                processed['potential_gain'] = 0
+                processed['risk'] = 0
+
+            # Calculate signal strength based on risk-reward ratio
+            rr_ratio = processed.get('risk_reward', 0)
             if rr_ratio >= 3:
                 processed['strength'] = 5
             elif rr_ratio >= 2:
@@ -98,12 +111,19 @@ def list_results():
                 processed['strength'] = 2
             else:
                 processed['strength'] = 1
+        else:
+            # For DATA/EXPLORE scanners, no risk calculations needed
+            processed['potential_gain'] = 0
+            processed['risk'] = 0
+            processed['strength'] = 0
 
         # Count signal types
         if r.signal == 'BUY':
             buy_signals += 1
         elif r.signal == 'SELL':
             sell_signals += 1
+        elif r.signal in ['DATA', 'EXPLORE']:
+            no_signals += 1  # Data rows, not signals
         else:
             no_signals += 1
 
@@ -153,10 +173,8 @@ def list_results():
     }
 
     # Check if we have exploration data
-    has_exploration_data = any(metrics.get('crossovers') for r in results for metrics in [r.get_metrics() if r.metrics else {}])
-
-    if has_exploration_data:
-        # Redirect to exploration view
+    if results and any(r.signal in ['EXPLORE', 'DATA'] for r in results):
+        # Redirect to exploration view for EXPLORE/DATA type scanners
         return redirect(url_for('results.exploration_view', scan_id=scan_id))
 
     return render_template('results/comprehensive.html',
@@ -210,73 +228,27 @@ def exploration_view(scan_id):
         ScanResult.timestamp >= history.started_at
     ).all()
 
-    # Process exploration results
-    exploration_results = []
+    # Simply pass all results for exploration display
+    # The template will handle the dynamic columns
+    exploration_results = results
     stock_summaries = []
     total_buy_signals = 0
     total_sell_signals = 0
 
+    # Count signal types
     for r in results:
-        metrics = r.get_metrics() if r.metrics else {}
-
-        # Extract crossovers from metrics
-        crossovers = metrics.get('crossovers', [])
-        symbol = r.symbol
-
-        # Create stock summary
-        if crossovers:
-            stock_summary = {
-                'symbol': symbol,
-                'current_price': metrics.get('current_price', 0),
-                'trend': metrics.get('current_trend', 'UNKNOWN'),
-                'crossover_count': len(crossovers),
-                'latest_signal': crossovers[-1]['type'] if crossovers else None,
-                'latest_price': crossovers[-1]['price'] if crossovers else 0,
-                'latest_date': crossovers[-1]['date'] if crossovers else ''
-            }
-            stock_summaries.append(stock_summary)
-
-            # Add all crossovers to exploration results
-            for idx, crossover in enumerate(crossovers):
-                is_latest = (idx == len(crossovers) - 1)
-
-                exploration_result = {
-                    'symbol': symbol,
-                    'date': crossover.get('date', ''),
-                    'type': crossover.get('type', ''),
-                    'price': crossover.get('price', 0),
-                    'ema10': crossover.get('ema10', 0),
-                    'ema20': crossover.get('ema20', 0),
-                    'macd': crossover.get('macd', 0),
-                    'atr': crossover.get('atr', 0),
-                    'atr_pct': crossover.get('short_atr_pct', 0),
-                    'entry': crossover.get('entry', 0),
-                    'target': crossover.get('target', 0),
-                    'stop_loss': crossover.get('stop_loss', 0),
-                    'risk_reward': crossover.get('risk_reward', 0),
-                    'volume': crossover.get('volume', 0),
-                    'is_latest': is_latest,
-                    'is_active': is_latest  # Can be enhanced with actual trade status
-                }
-
-                exploration_results.append(exploration_result)
-
-                # Count signals
-                if crossover.get('type') == 'BUY':
-                    total_buy_signals += 1
-                elif crossover.get('type') == 'SELL':
-                    total_sell_signals += 1
-
-    # Sort exploration results by date (most recent first)
-    exploration_results.sort(key=lambda x: (x['date'], x['symbol']), reverse=True)
+        if r.signal == 'BUY':
+            total_buy_signals += 1
+        elif r.signal == 'SELL':
+            total_sell_signals += 1
 
     # Calculate summary
     summary = {
         'total_scanned': len(results),
-        'total_signals': len(exploration_results),
+        'total_signals': len(results),  # All results are signals in exploration
         'buy_signals': total_buy_signals,
         'sell_signals': total_sell_signals,
-        'avg_crossovers': len(exploration_results) / len(results) if results else 0
+        'avg_crossovers': 0  # Not applicable for simple exploration
     }
 
     # Get scan info
@@ -291,6 +263,7 @@ def exploration_view(scan_id):
 
     return render_template('results/exploration.html',
                          scan=history,
+                         results=results,  # For backward compatibility
                          exploration_results=exploration_results,
                          stock_summaries=stock_summaries,
                          summary=summary,

@@ -1,0 +1,203 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Basic Exploration - LTP & EMAs{% endblock %}
+
+{% block content %}
+<div class="container-fluid mx-auto px-4">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <h1 class="text-2xl font-bold">Basic Exploration Results</h1>
+            <p class="text-sm opacity-70">
+                LTP, EMA10, EMA20 for All Stocks |
+                Watchlist: {{ scan_info.watchlist_name }} |
+                Time: {{ scan_info.timestamp }}
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <button class="btn btn-sm btn-primary" onclick="exportToCSV()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+                Export CSV
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="window.location.reload()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                </svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Total Stocks</div>
+            <div class="stat-value text-lg">{{ summary.total_stocks }}</div>
+        </div>
+        <div class="stat bg-success/20 rounded p-2">
+            <div class="stat-title text-xs">Bullish</div>
+            <div class="stat-value text-lg text-success">{{ summary.bullish_count }}</div>
+        </div>
+        <div class="stat bg-error/20 rounded p-2">
+            <div class="stat-title text-xs">Bearish</div>
+            <div class="stat-value text-lg text-error">{{ summary.bearish_count }}</div>
+        </div>
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Above EMA10</div>
+            <div class="stat-value text-lg">{{ summary.above_ema10 }}</div>
+        </div>
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Above EMA20</div>
+            <div class="stat-value text-lg">{{ summary.above_ema20 }}</div>
+        </div>
+    </div>
+
+    <!-- Basic Exploration Table (Amibroker Style) -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-compact table-zebra w-full text-xs">
+                    <thead class="bg-base-300 sticky top-0">
+                        <tr>
+                            <th class="text-left">#</th>
+                            <th class="text-left">Symbol</th>
+                            <th class="text-right">LTP</th>
+                            <th class="text-right">EMA10</th>
+                            <th class="text-right">EMA20</th>
+                            <th class="text-center">Trend</th>
+                            <th class="text-right">EMA Diff</th>
+                            <th class="text-right">EMA Diff %</th>
+                            <th class="text-right">From EMA10</th>
+                            <th class="text-right">From EMA10 %</th>
+                            <th class="text-right">From EMA20</th>
+                            <th class="text-right">From EMA20 %</th>
+                            <th class="text-right">Volume</th>
+                            <th class="text-center">Above EMA10</th>
+                            <th class="text-center">Above EMA20</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in exploration_results %}
+                        <tr class="hover">
+                            <td>{{ loop.index }}</td>
+                            <td class="font-mono font-bold">{{ result.symbol }}</td>
+                            <td class="text-right font-mono font-bold">{{ "%.2f"|format(result.ltp) }}</td>
+                            <td class="text-right font-mono text-info">{{ "%.2f"|format(result.ema10) }}</td>
+                            <td class="text-right font-mono text-warning">{{ "%.2f"|format(result.ema20) }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-sm
+                                    {% if result.trend == 'BULLISH' %}badge-success
+                                    {% elif result.trend == 'BEARISH' %}badge-error
+                                    {% else %}badge-ghost{% endif %}">
+                                    {{ result.trend }}
+                                </span>
+                            </td>
+                            <td class="text-right font-mono
+                                {% if result.ema_diff > 0 %}text-success
+                                {% elif result.ema_diff < 0 %}text-error{% endif %}">
+                                {{ "%.2f"|format(result.ema_diff) }}
+                            </td>
+                            <td class="text-right font-mono
+                                {% if result.ema_diff_pct > 0 %}text-success
+                                {% elif result.ema_diff_pct < 0 %}text-error{% endif %}">
+                                {{ "%.2f"|format(result.ema_diff_pct) }}%
+                            </td>
+                            <td class="text-right font-mono
+                                {% if result.dist_from_ema10 > 0 %}text-success
+                                {% elif result.dist_from_ema10 < 0 %}text-error{% endif %}">
+                                {{ "%.2f"|format(result.dist_from_ema10) }}
+                            </td>
+                            <td class="text-right font-mono
+                                {% if result.dist_from_ema10_pct > 2 %}bg-success/20
+                                {% elif result.dist_from_ema10_pct < -2 %}bg-error/20{% endif %}">
+                                {{ "%.2f"|format(result.dist_from_ema10_pct) }}%
+                            </td>
+                            <td class="text-right font-mono
+                                {% if result.dist_from_ema20 > 0 %}text-success
+                                {% elif result.dist_from_ema20 < 0 %}text-error{% endif %}">
+                                {{ "%.2f"|format(result.dist_from_ema20) }}
+                            </td>
+                            <td class="text-right font-mono
+                                {% if result.dist_from_ema20_pct > 3 %}bg-success/20
+                                {% elif result.dist_from_ema20_pct < -3 %}bg-error/20{% endif %}">
+                                {{ "%.2f"|format(result.dist_from_ema20_pct) }}%
+                            </td>
+                            <td class="text-right font-mono text-xs">{{ "{:,.0f}".format(result.volume) }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-xs {% if result.above_ema10 == 'YES' %}badge-success{% else %}badge-error{% endif %}">
+                                    {{ result.above_ema10 }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-xs {% if result.above_ema20 == 'YES' %}badge-success{% else %}badge-error{% endif %}">
+                                    {{ result.above_ema20 }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Amibroker-style table styling */
+.table-zebra tbody tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark .table-zebra tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.table th {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.table td {
+    white-space: nowrap;
+}
+
+/* Highlight rows on hover */
+.table tbody tr:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+</style>
+
+<script>
+// Store results for export
+const explorationData = {{ exploration_results|tojson|safe }};
+
+function exportToCSV() {
+    // Create CSV header
+    let csv = 'Symbol,LTP,EMA10,EMA20,Trend,EMA Diff,EMA Diff %,From EMA10,From EMA10 %,From EMA20,From EMA20 %,Volume,Above EMA10,Above EMA20\\n';
+
+    // Add data rows
+    explorationData.forEach(row => {
+        csv += `${row.symbol},${row.ltp},${row.ema10},${row.ema20},${row.trend},`;
+        csv += `${row.ema_diff},${row.ema_diff_pct},${row.dist_from_ema10},${row.dist_from_ema10_pct},`;
+        csv += `${row.dist_from_ema20},${row.dist_from_ema20_pct},${row.volume},`;
+        csv += `${row.above_ema10},${row.above_ema20}\\n`;
+    });
+
+    // Download CSV
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'basic_exploration_' + new Date().toISOString().slice(0, 10) + '.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Auto-refresh every 60 seconds
+setTimeout(() => window.location.reload(), 60000);
+</script>
+{% endblock %}

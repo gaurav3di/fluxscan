@@ -1,0 +1,141 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Scanner Results - Universal View{% endblock %}
+
+{% block content %}
+<div class="container-fluid mx-auto px-4">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <h1 class="text-2xl font-bold">Scanner Results</h1>
+            <p class="text-sm opacity-70">
+                {{ scan_info.scanner_name }} | {{ scan_info.watchlist_name }} | {{ scan_info.timestamp }}
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <button class="btn btn-sm btn-primary" onclick="exportToCSV()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+                Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Dynamic Results Table -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-compact table-zebra w-full text-xs">
+                    <thead class="bg-base-300">
+                        <tr>
+                            <th>#</th>
+                            <th>Symbol</th>
+                            {% if results and results[0] %}
+                                {% if results[0]['signal'] in ['BUY', 'SELL'] %}
+                                    <!-- Trading signals columns -->
+                                    <th>Signal</th>
+                                    <th>Price</th>
+                                    <th>Entry</th>
+                                    <th>Target</th>
+                                    <th>Stop Loss</th>
+                                    <th>R:R</th>
+                                {% elif results[0]['signal'] in ['DATA', 'EXPLORE'] %}
+                                    <!-- Simple exploration columns -->
+                                    <th>LTP</th>
+                                    <th>EMA10</th>
+                                    <th>EMA20</th>
+                                    {% for key in results[0].keys() if key not in ['symbol', 'signal', 'timestamp', 'metrics', 'ltp', 'ema10', 'ema20'] %}
+                                        <th>{{ key.replace('_', ' ').title() }}</th>
+                                    {% endfor %}
+                                {% else %}
+                                    <!-- Generic columns from metrics -->
+                                    {% for key in results[0].keys() if key not in ['symbol', 'signal', 'timestamp', 'metrics'] %}
+                                        <th>{{ key.replace('_', ' ').title() }}</th>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results %}
+                        <tr class="hover">
+                            <td>{{ loop.index }}</td>
+                            <td class="font-bold">{{ result['symbol'] }}</td>
+
+                            {% if result['signal'] in ['BUY', 'SELL'] %}
+                                <!-- Trading signals data -->
+                                <td>
+                                    <span class="badge badge-sm {% if result['signal'] == 'BUY' %}badge-success{% else %}badge-error{% endif %}">
+                                        {{ result['signal'] }}
+                                    </span>
+                                </td>
+                                <td>{{ "%.2f"|format(result.get('close_price', 0)) }}</td>
+                                <td>{{ "%.2f"|format(result.get('entry', 0)) }}</td>
+                                <td class="text-success">{{ "%.2f"|format(result.get('target', 0)) }}</td>
+                                <td class="text-error">{{ "%.2f"|format(result.get('stop_loss', 0)) }}</td>
+                                <td>{{ "%.2f"|format(result.get('risk_reward', 0)) }}</td>
+                            {% elif result['signal'] in ['DATA', 'EXPLORE'] %}
+                                <!-- Simple exploration data -->
+                                <td class="font-mono">{{ "%.2f"|format(result.get('ltp', 0)) }}</td>
+                                <td class="font-mono">{{ "%.2f"|format(result.get('ema10', 0)) }}</td>
+                                <td class="font-mono">{{ "%.2f"|format(result.get('ema20', 0)) }}</td>
+                                {% for key in result.keys() if key not in ['symbol', 'signal', 'timestamp', 'metrics', 'ltp', 'ema10', 'ema20'] %}
+                                    <td>
+                                        {% if result[key] is number %}
+                                            {{ "%.2f"|format(result[key]) if result[key] < 1000000 else "{:,.0f}".format(result[key]) }}
+                                        {% else %}
+                                            {{ result[key] }}
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                            {% else %}
+                                <!-- Generic data -->
+                                {% for key in result.keys() if key not in ['symbol', 'signal', 'timestamp', 'metrics'] %}
+                                    <td>
+                                        {% if result[key] is number %}
+                                            {{ "%.2f"|format(result[key]) if result[key] < 1000000 else "{:,.0f}".format(result[key]) }}
+                                        {% else %}
+                                            {{ result[key] }}
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const resultsData = {{ results|tojson|safe }};
+
+function exportToCSV() {
+    if (resultsData.length === 0) return;
+
+    // Get headers from first result
+    const headers = Object.keys(resultsData[0]).filter(k => k !== 'metrics');
+    let csv = headers.join(',') + '\\n';
+
+    // Add data rows
+    resultsData.forEach(row => {
+        const values = headers.map(h => {
+            const val = row[h];
+            return typeof val === 'string' ? `"${val}"` : val;
+        });
+        csv += values.join(',') + '\\n';
+    });
+
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'scanner_results_' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+}
+</script>
+{% endblock %}

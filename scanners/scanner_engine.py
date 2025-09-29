@@ -121,8 +121,19 @@ class ScannerEngine:
             # Execute scanner code
             exec(compiled_code, local_namespace)
 
-            # Check for signal
-            if 'signal' in local_namespace and local_namespace['signal']:
+            # Check for Amibroker-style Filter first
+            if local_namespace.get('Filter', False):
+                # Use columns if AddColumn was used
+                if local_namespace.get('columns'):
+                    return {
+                        'symbol': symbol,
+                        'signal': 'EXPLORE',
+                        'metrics': local_namespace['columns'],
+                        'timestamp': datetime.now().isoformat()
+                    }
+
+            # Legacy check for backward compatibility
+            elif 'signal' in local_namespace and local_namespace['signal']:
                 metrics = local_namespace.get('metrics', {})
 
                 # Extract additional data if available
@@ -148,6 +159,13 @@ class ScannerEngine:
         return None
 
     def _create_namespace(self, parameters):
+        # Columns storage for Amibroker-style exploration
+        columns = {}
+
+        # AddColumn function (Amibroker style)
+        def AddColumn(name, value, format_spec='1.2'):
+            columns[name] = value
+
         namespace = {
             'pd': pd,
             'np': np,
@@ -156,7 +174,11 @@ class ScannerEngine:
             'parameters': parameters or {},
             'signal': False,
             'signal_type': None,
-            'metrics': {}
+            'metrics': {},
+            # Amibroker-style exploration
+            'Filter': False,
+            'AddColumn': AddColumn,
+            'columns': columns
         }
 
         # Add TA-Lib functions

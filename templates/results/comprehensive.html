@@ -73,25 +73,29 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for result in results %}
-                            <tr class="hover {% if result['signal'] == 'BUY' %}bg-success/10{% elif result['signal'] == 'SELL' %}bg-error/10{% endif %}">
+                            {% for result in processed_results %}
+                            <tr class="hover {% if result.get('signal') == 'BUY' %}bg-success/10{% elif result.get('signal') == 'SELL' %}bg-error/10{% endif %}">
                                 <td class="sticky left-0 bg-base-100">{{ loop.index }}</td>
-                                <td class="sticky left-12 bg-base-100 font-bold">{{ result['symbol'] }}</td>
+                                <td class="sticky left-12 bg-base-100 font-bold">{{ result.get('symbol', '') }}</td>
                                 <td>
-                                    <span class="badge {% if result['signal'] == 'BUY' %}badge-success{% elif result['signal'] == 'SELL' %}badge-error{% else %}badge-ghost{% endif %}">
-                                        {{ result['signal'] or 'NO SIGNAL' }}
-                                    </span>
+                                    {% if result.get('signal') in ['DATA', 'EXPLORE'] %}
+                                        <span class="badge badge-ghost">DATA</span>
+                                    {% else %}
+                                        <span class="badge {% if result.get('signal') == 'BUY' %}badge-success{% elif result.get('signal') == 'SELL' %}badge-error{% else %}badge-ghost{% endif %}">
+                                            {{ result.get('signal', 'NO SIGNAL') }}
+                                        </span>
+                                    {% endif %}
                                 </td>
-                                <td class="font-mono">{{ "%.2f"|format(result['close_price']) }}</td>
-                                <td class="font-mono">{{ "%.2f"|format(result['macd']) }}</td>
-                                <td class="text-xs">{{ "{:,.0f}".format(result['volume']) }}</td>
-                                <td class="font-mono text-xs">{{ "%.2f"|format(result['ema10']) }}</td>
-                                <td class="font-mono text-xs">{{ "%.2f"|format(result['ema20']) }}</td>
-                                <td class="font-mono text-xs">{{ "%.2f"|format(result['short_atr']) }}</td>
-                                <td class="font-mono text-sm">{{ "%.2f"|format(result['entry']) if result['entry'] else '-' }}</td>
-                                <td class="font-mono text-sm text-success">{{ "%.2f"|format(result['target']) if result['target'] else '-' }}</td>
-                                <td class="font-mono text-sm text-error">{{ "%.2f"|format(result['stop_loss']) if result['stop_loss'] else '-' }}</td>
-                                <td>{{ "%.2f"|format(result['risk_reward']) if result['risk_reward'] else '-' }}</td>
+                                <td class="font-mono">{{ "%.2f"|format(result.get('close_price', result.get('ltp', 0))) }}</td>
+                                <td class="font-mono">{{ "%.2f"|format(result.get('macd', 0)) if result.get('signal') in ['BUY', 'SELL'] else '-' }}</td>
+                                <td class="text-xs">{{ "{:,.0f}".format(result.get('volume', 0)) if result.get('volume') else '-' }}</td>
+                                <td class="font-mono text-xs">{{ "%.2f"|format(result.get('ema10', 0)) if result.get('ema10') else '-' }}</td>
+                                <td class="font-mono text-xs">{{ "%.2f"|format(result.get('ema20', 0)) if result.get('ema20') else '-' }}</td>
+                                <td class="font-mono text-xs">{{ "%.2f"|format(result.get('short_atr', 0)) if result.get('signal') in ['BUY', 'SELL'] else '-' }}</td>
+                                <td class="font-mono text-sm">{{ "%.2f"|format(result.get('entry', 0)) if result.get('entry') else '-' }}</td>
+                                <td class="font-mono text-sm text-success">{{ "%.2f"|format(result.get('target', 0)) if result.get('target') else '-' }}</td>
+                                <td class="font-mono text-sm text-error">{{ "%.2f"|format(result.get('stop_loss', 0)) if result.get('stop_loss') else '-' }}</td>
+                                <td>{{ "%.2f"|format(result.get('risk_reward', 0)) if result.get('risk_reward') else '-' }}</td>
                                 <td>
                                     <div class="flex gap-1">
                                         <button class="btn btn-xs btn-ghost" onclick="viewChart('{{ result['symbol'] }}')">
@@ -135,7 +139,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for result in results if result['signal'] in ['BUY', 'SELL'] %}
+                            {% for result in processed_results if result.get('signal') in ['BUY', 'SELL'] %}
                             <tr class="hover {% if result['signal'] == 'BUY' %}bg-success/20{% else %}bg-error/20{% endif %}">
                                 <td>{{ loop.index }}</td>
                                 <td class="font-bold text-lg">{{ result['symbol'] }}</td>

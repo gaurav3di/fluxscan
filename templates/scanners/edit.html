@@ -166,30 +166,6 @@ else:
                 </div>
             </div>
 
-            <!-- Test Scanner -->
-            <div class="card bg-base-100 shadow-xl">
-                <div class="card-body">
-                    <h2 class="card-title mb-4">Test Scanner</h2>
-
-                    <div class="form-control w-full">
-                        <label class="label">
-                            <span class="label-text">Test Symbols</span>
-                        </label>
-                        <input type="text" id="test-symbols" placeholder="RELIANCE,TCS,INFY"
-                               class="input input-bordered w-full"
-                               value="RELIANCE,TCS,INFY" />
-                    </div>
-
-                    <button class="btn btn-secondary w-full mt-4" onclick="testScanner()">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                        </svg>
-                        Run Test
-                    </button>
-
-                    <div id="test-results" class="mt-4 hidden"></div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -307,70 +283,6 @@ async function validateCode() {
     }
 }
 
-async function testScanner() {
-    const symbols = document.getElementById('test-symbols').value.split(',').map(s => s.trim());
-    const code = document.getElementById('scanner-code').value;
-    const parameters = getParameters();
-    const resultsDiv = document.getElementById('test-results');
-
-    resultsDiv.classList.remove('hidden');
-    resultsDiv.innerHTML = '<span class="loading loading-spinner loading-md"></span> Running test...';
-
-    try {
-        const response = await fetch('/scanners/api/scanners/test', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                code: code,
-                symbols: symbols,
-                parameters: parameters
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'completed') {
-            resultsDiv.innerHTML = `
-                <div class="alert alert-success">
-                    <span>Test completed: ${result.results.length} signals found</span>
-                </div>
-                ${result.results.length > 0 ? `
-                    <div class="overflow-x-auto mt-2">
-                        <table class="table table-xs">
-                            <thead>
-                                <tr>
-                                    <th>Symbol</th>
-                                    <th>Signal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${result.results.map(r => `
-                                    <tr>
-                                        <td>${r.symbol}</td>
-                                        <td><span class="badge badge-sm">${r.signal}</span></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                ` : ''}
-            `;
-        } else {
-            resultsDiv.innerHTML = `
-                <div class="alert alert-error">
-                    <span>Test failed: ${result.error || 'Unknown error'}</span>
-                </div>
-            `;
-        }
-    } catch (error) {
-        resultsDiv.innerHTML = `
-            <div class="alert alert-error">
-                <span>Test failed: ${error.message}</span>
-            </div>
-        `;
-    }
-}
-
 async function saveScanner() {
     const name = document.getElementById('scanner-name').value;
     const description = document.getElementById('scanner-description').value;
@@ -425,9 +337,19 @@ function formatCode() {
     codeArea.value = codeArea.value.trim();
 }
 
-function loadTemplate(templateId) {
-    // In a real implementation, fetch template details and load into editor
-    FluxScan.showToast('Loading template...', 'info');
+async function loadTemplate(templateId) {
+    try {
+        const response = await fetch(`/scanners/api/templates/${templateId}`);
+        if (response.ok) {
+            const template = await response.json();
+            document.getElementById('scanner-code').value = template.code;
+            FluxScan.showToast('Template loaded successfully', 'success');
+        } else {
+            FluxScan.showToast('Failed to load template', 'error');
+        }
+    } catch (error) {
+        FluxScan.showToast('Failed to load template', 'error');
+    }
 }
 </script>
 {% endblock %}

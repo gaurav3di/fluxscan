@@ -1,0 +1,324 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Scanner Results - Amibroker Style{% endblock %}
+
+{% block content %}
+<div class="container-fluid mx-auto px-4">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <h1 class="text-2xl font-bold">Scanner Results - Exploration View</h1>
+            <p class="text-sm opacity-70">{{ scan_info.scanner_name }} on {{ scan_info.watchlist_name }} - {{ scan_info.timestamp }}</p>
+        </div>
+        <div class="flex gap-2">
+            <button class="btn btn-sm btn-ghost" onclick="refreshResults()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                </svg>
+                Refresh
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="exportToCSV()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+                Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Total Scanned</div>
+            <div class="stat-value text-lg">{{ summary.total_scanned }}</div>
+        </div>
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Buy Signals</div>
+            <div class="stat-value text-lg text-success">{{ summary.buy_signals }}</div>
+        </div>
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Sell Signals</div>
+            <div class="stat-value text-lg text-error">{{ summary.sell_signals }}</div>
+        </div>
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Avg R:R</div>
+            <div class="stat-value text-lg">{{ "%.2f"|format(summary.avg_risk_reward|default(0, true)) }}</div>
+        </div>
+    </div>
+
+    <!-- Amibroker-Style Results Table -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body p-0">
+
+            <!-- All Results Tab -->
+            <div id="results-tab" class="tab-content">
+                <div class="overflow-x-auto">
+                    <table class="table table-compact table-zebra w-full text-xs">
+                        <thead class="bg-base-300">
+                            <tr>
+                                <th class="text-left">#</th>
+                                <th class="text-left">Symbol</th>
+                                <th class="text-center">Signal</th>
+                                <th class="text-right">Close Price</th>
+                                <th class="text-right">MACD</th>
+                                <th class="text-right">Volume</th>
+                                <th class="text-right">EMA 10</th>
+                                <th class="text-right">EMA 20</th>
+                                <th class="text-right">ATR</th>
+                                <th class="text-right">Entry</th>
+                                <th class="text-right">Target</th>
+                                <th class="text-right">Stop Loss</th>
+                                <th class="text-right">R:R</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in results %}
+                            <tr class="hover {% if result['signal'] == 'BUY' %}bg-success/10{% elif result['signal'] == 'SELL' %}bg-error/10{% endif %}">
+                                <td class="sticky left-0 bg-base-100">{{ loop.index }}</td>
+                                <td class="sticky left-12 bg-base-100 font-bold">{{ result['symbol'] }}</td>
+                                <td>
+                                    <span class="badge {% if result['signal'] == 'BUY' %}badge-success{% elif result['signal'] == 'SELL' %}badge-error{% else %}badge-ghost{% endif %}">
+                                        {{ result['signal'] or 'NO SIGNAL' }}
+                                    </span>
+                                </td>
+                                <td class="font-mono">{{ "%.2f"|format(result['close_price']) }}</td>
+                                <td class="font-mono">{{ "%.2f"|format(result['macd']) }}</td>
+                                <td class="text-xs">{{ "{:,.0f}".format(result['volume']) }}</td>
+                                <td class="font-mono text-xs">{{ "%.2f"|format(result['ema10']) }}</td>
+                                <td class="font-mono text-xs">{{ "%.2f"|format(result['ema20']) }}</td>
+                                <td class="font-mono text-xs">{{ "%.2f"|format(result['short_atr']) }}</td>
+                                <td class="font-mono text-sm">{{ "%.2f"|format(result['entry']) if result['entry'] else '-' }}</td>
+                                <td class="font-mono text-sm text-success">{{ "%.2f"|format(result['target']) if result['target'] else '-' }}</td>
+                                <td class="font-mono text-sm text-error">{{ "%.2f"|format(result['stop_loss']) if result['stop_loss'] else '-' }}</td>
+                                <td>{{ "%.2f"|format(result['risk_reward']) if result['risk_reward'] else '-' }}</td>
+                                <td>
+                                    <div class="flex gap-1">
+                                        <button class="btn btn-xs btn-ghost" onclick="viewChart('{{ result['symbol'] }}')">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                        <button class="btn btn-xs btn-ghost" onclick="addToWatchlist('{{ result['symbol'] }}')">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Signals Only Tab -->
+            <div id="signals-tab" class="tab-content hidden">
+                <div class="overflow-x-auto">
+                    <table class="table table-compact w-full">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Symbol</th>
+                                <th>Signal</th>
+                                <th>Entry Price</th>
+                                <th>Target</th>
+                                <th>Stop Loss</th>
+                                <th>Potential %</th>
+                                <th>Risk %</th>
+                                <th>R:R Ratio</th>
+                                <th>Volume</th>
+                                <th>Strength</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in results if result['signal'] in ['BUY', 'SELL'] %}
+                            <tr class="hover {% if result['signal'] == 'BUY' %}bg-success/20{% else %}bg-error/20{% endif %}">
+                                <td>{{ loop.index }}</td>
+                                <td class="font-bold text-lg">{{ result['symbol'] }}</td>
+                                <td>
+                                    <span class="badge badge-lg {% if result['signal'] == 'BUY' %}badge-success{% else %}badge-error{% endif %}">
+                                        {{ result['signal'] }}
+                                    </span>
+                                </td>
+                                <td class="font-mono font-bold">{{ "%.2f"|format(result['entry']) }}</td>
+                                <td class="font-mono text-success font-bold">{{ "%.2f"|format(result['target']) }}</td>
+                                <td class="font-mono text-error">{{ "%.2f"|format(result['stop_loss']) }}</td>
+                                <td class="text-success font-bold">+{{ "%.1f"|format(result['potential_gain']) }}%</td>
+                                <td class="text-error">-{{ "%.1f"|format(result['risk']) }}%</td>
+                                <td class="font-bold">{{ "%.2f"|format(result['risk_reward']) }}</td>
+                                <td class="text-xs">{{ "{:,.0f}".format(result['volume']) }}</td>
+                                <td>
+                                    <div class="rating rating-sm">
+                                        {% for i in range(1, 6) %}
+                                        <input type="radio" class="mask mask-star-2 bg-orange-400" disabled {% if i == result['strength'] %}checked{% endif %} />
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" onclick="executeTrade('{{ result['symbol'] }}', '{{ result['signal'] }}', {{ result['entry'] }})">
+                                        Execute
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Summary Tab -->
+            <div id="summary-tab" class="tab-content hidden">
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <!-- Summary Stats -->
+                        <div class="stat bg-base-200 rounded-box">
+                            <div class="stat-title">Total Stocks Scanned</div>
+                            <div class="stat-value">{{ summary.total_scanned }}</div>
+                            <div class="stat-desc">{{ summary.watchlist_name }}</div>
+                        </div>
+
+                        <div class="stat bg-success/20 rounded-box">
+                            <div class="stat-title">Buy Signals</div>
+                            <div class="stat-value text-success">{{ summary.buy_signals }}</div>
+                            <div class="stat-desc">{{ "%.1f"|format(summary.buy_percentage) }}% of total</div>
+                        </div>
+
+                        <div class="stat bg-error/20 rounded-box">
+                            <div class="stat-title">Sell Signals</div>
+                            <div class="stat-value text-error">{{ summary.sell_signals }}</div>
+                            <div class="stat-desc">{{ "%.1f"|format(summary.sell_percentage) }}% of total</div>
+                        </div>
+
+                        <div class="stat bg-base-200 rounded-box">
+                            <div class="stat-title">No Signals</div>
+                            <div class="stat-value">{{ summary.no_signals }}</div>
+                            <div class="stat-desc">{{ "%.1f"|format(summary.no_signal_percentage) }}% of total</div>
+                        </div>
+                    </div>
+
+                    <!-- Top Movers -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Top Buy Signals -->
+                        <div class="card bg-base-200">
+                            <div class="card-body">
+                                <h3 class="card-title text-success">Top Buy Signals</h3>
+                                <div class="space-y-2">
+                                    {% for signal in summary.top_buy_signals[:5] %}
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-bold">{{ signal.symbol }}</span>
+                                        <div class="text-right">
+                                            <span class="text-sm">₹{{ "%.2f"|format(signal.price) }}</span>
+                                            <span class="badge badge-success badge-sm ml-2">{{ "%.1f"|format(signal.strength) }}%</span>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Top Sell Signals -->
+                        <div class="card bg-base-200">
+                            <div class="card-body">
+                                <h3 class="card-title text-error">Top Sell Signals</h3>
+                                <div class="space-y-2">
+                                    {% for signal in summary.top_sell_signals[:5] %}
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-bold">{{ signal.symbol }}</span>
+                                        <div class="text-right">
+                                            <span class="text-sm">₹{{ "%.2f"|format(signal.price) }}</span>
+                                            <span class="badge badge-error badge-sm ml-2">{{ "%.1f"|format(signal.strength) }}%</span>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scanner Performance -->
+                    <div class="card bg-base-200 mt-6">
+                        <div class="card-body">
+                            <h3 class="card-title">Scanner Performance</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                    <div class="text-sm opacity-70">Execution Time</div>
+                                    <div class="font-bold">{{ summary.execution_time }}s</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm opacity-70">Avg Signal Strength</div>
+                                    <div class="font-bold">{{ "%.1f"|format(summary.avg_signal_strength) }}%</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm opacity-70">Avg Risk/Reward</div>
+                                    <div class="font-bold">1:{{ summary.avg_risk_reward }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm opacity-70">Market Trend</div>
+                                    <div class="font-bold {% if summary.market_trend == 'Bullish' %}text-success{% elif summary.market_trend == 'Bearish' %}text-error{% endif %}">
+                                        {{ summary.market_trend }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function switchTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+
+    // Remove active from all tab buttons
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('tab-active');
+    });
+
+    // Show selected tab
+    document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+
+    // Set active tab button
+    event.target.closest('.tab').classList.add('tab-active');
+}
+
+function viewChart(symbol) {
+    // Open chart view for the symbol
+    window.open(`/chart/${symbol}`, '_blank');
+}
+
+function addToWatchlist(symbol) {
+    FluxScan.showToast(`${symbol} added to watchlist`, 'success');
+}
+
+function executeTrade(symbol, signal, price) {
+    // Integrate with trading system
+    FluxScan.showToast(`${signal} order placed for ${symbol} at ${price}`, 'success');
+}
+
+function exportToCSV() {
+    FluxScan.exportResults('csv', {
+        scan_id: '{{ scan_id }}'
+    });
+}
+
+function refreshResults() {
+    location.reload();
+}
+
+// Auto-refresh every 30 seconds if scan is running
+{% if scan_status == 'running' %}
+setInterval(() => {
+    refreshResults();
+}, 30000);
+{% endif %}
+</script>
+{% endblock %}

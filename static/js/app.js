@@ -98,7 +98,7 @@ async function apiRequest(url, options = {}) {
 // Scanner Functions
 async function runScanner(scannerId, watchlistId, parameters = {}) {
     try {
-        const result = await apiRequest('/scan/api/scan', {
+        const result = await apiRequest('/scanners/api/scan', {
             method: 'POST',
             body: JSON.stringify({
                 scanner_id: scannerId,
@@ -117,6 +117,55 @@ async function runScanner(scannerId, watchlistId, parameters = {}) {
         showToast(`Failed to start scan: ${error.message}`, 'error');
         throw error;
     }
+}
+
+async function deleteScanner(scannerId) {
+    // Store the scanner ID for the modal
+    window.scannerToDelete = scannerId;
+
+    // Show the delete confirmation modal
+    const modal = document.getElementById('deleteScannerModal');
+    if (modal) {
+        modal.showModal();
+    } else {
+        // Fallback to confirm if modal doesn't exist
+        if (confirm('Are you sure you want to delete this scanner?')) {
+            performScannerDeletion(scannerId);
+        }
+    }
+}
+
+async function performScannerDeletion(scannerId) {
+    try {
+        await apiRequest(`/scanners/api/scanners/${scannerId}`, {
+            method: 'DELETE'
+        });
+        showToast('Scanner deleted successfully', 'success');
+
+        // Close modal if it exists
+        const modal = document.getElementById('deleteScannerModal');
+        if (modal) {
+            modal.close();
+        }
+
+        setTimeout(() => location.reload(), 1000);
+    } catch (error) {
+        showToast(`Failed to delete scanner: ${error.message}`, 'error');
+    }
+}
+
+function confirmDeleteScanner() {
+    if (window.scannerToDelete) {
+        performScannerDeletion(window.scannerToDelete);
+    }
+}
+
+function cancelDeleteScanner() {
+    const modal = document.getElementById('deleteScannerModal');
+    if (modal) {
+        modal.close();
+    }
+    window.scannerToDelete = null;
 }
 
 async function validateScannerCode(code) {
@@ -253,6 +302,9 @@ document.addEventListener('DOMContentLoaded', function() {
 window.FluxScan = {
     showToast,
     runScanner,
+    deleteScanner,
+    confirmDeleteScanner,
+    cancelDeleteScanner,
     validateScannerCode,
     importWatchlist,
     searchSymbols,

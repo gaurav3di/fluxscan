@@ -1,0 +1,234 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Exploration Results - Amibroker Style{% endblock %}
+
+{% block content %}
+<div class="container-fluid mx-auto px-4">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <h1 class="text-2xl font-bold">Exploration Results</h1>
+            <p class="text-sm opacity-70">
+                Scanner: {{ scan_info.scanner_name }} | Watchlist: {{ scan_info.watchlist_name }} |
+                Time: {{ scan_info.timestamp }}
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <button class="btn btn-sm btn-primary" onclick="exportToExcel()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+                Export Excel
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="window.print()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
+                </svg>
+                Print
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Total Scanned</div>
+            <div class="stat-value text-lg">{{ summary.total_scanned }}</div>
+        </div>
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Total Signals</div>
+            <div class="stat-value text-lg">{{ summary.total_signals }}</div>
+        </div>
+        <div class="stat bg-success/20 rounded p-2">
+            <div class="stat-title text-xs">Buy Signals</div>
+            <div class="stat-value text-lg text-success">{{ summary.buy_signals }}</div>
+        </div>
+        <div class="stat bg-error/20 rounded p-2">
+            <div class="stat-title text-xs">Sell Signals</div>
+            <div class="stat-value text-lg text-error">{{ summary.sell_signals }}</div>
+        </div>
+        <div class="stat bg-base-200 rounded p-2">
+            <div class="stat-title text-xs">Avg Crossovers/Stock</div>
+            <div class="stat-value text-lg">{{ "%.1f"|format(summary.avg_crossovers) }}</div>
+        </div>
+    </div>
+
+    <!-- Exploration Results Table -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-compact table-zebra w-full text-xs">
+                    <thead class="bg-base-300 sticky top-0">
+                        <tr>
+                            <th class="text-left">Ticker</th>
+                            <th class="text-left">Date/Time</th>
+                            <th class="text-center">Signal</th>
+                            <th class="text-right">Price</th>
+                            <th class="text-right">EMA10</th>
+                            <th class="text-right">EMA20</th>
+                            <th class="text-right">MACD</th>
+                            <th class="text-right">ATR</th>
+                            <th class="text-right">ATR%</th>
+                            <th class="text-right">Entry</th>
+                            <th class="text-right">Target</th>
+                            <th class="text-right">StopLoss</th>
+                            <th class="text-right">R:R</th>
+                            <th class="text-right">Volume</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in exploration_results %}
+                        <tr class="hover">
+                            <td class="font-mono font-bold">{{ result.symbol }}</td>
+                            <td class="text-xs">{{ result.date }}</td>
+                            <td class="text-center">
+                                {% if result.type == 'BUY' %}
+                                <span class="badge badge-success badge-sm">BUY</span>
+                                {% elif result.type == 'SELL' %}
+                                <span class="badge badge-error badge-sm">SELL</span>
+                                {% else %}
+                                <span class="badge badge-ghost badge-sm">{{ result.type }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right font-mono">{{ "%.2f"|format(result.price) }}</td>
+                            <td class="text-right font-mono text-info">{{ "%.2f"|format(result.ema10) }}</td>
+                            <td class="text-right font-mono text-warning">{{ "%.2f"|format(result.ema20) }}</td>
+                            <td class="text-right font-mono">{{ "%.2f"|format(result.macd) }}</td>
+                            <td class="text-right font-mono">{{ "%.2f"|format(result.atr) }}</td>
+                            <td class="text-right font-mono
+                                {% if result.atr_pct > 3 %}text-error
+                                {% elif result.atr_pct > 2 %}text-warning
+                                {% else %}text-success{% endif %}">
+                                {{ "%.2f"|format(result.atr_pct) }}%
+                            </td>
+                            <td class="text-right font-mono font-bold">{{ "%.2f"|format(result.entry) }}</td>
+                            <td class="text-right font-mono text-success">{{ "%.2f"|format(result.target) }}</td>
+                            <td class="text-right font-mono text-error">{{ "%.2f"|format(result.stop_loss) }}</td>
+                            <td class="text-right font-mono
+                                {% if result.risk_reward >= 2 %}text-success
+                                {% elif result.risk_reward >= 1.5 %}text-warning
+                                {% else %}text-error{% endif %}">
+                                {{ "%.2f"|format(result.risk_reward) }}
+                            </td>
+                            <td class="text-right font-mono text-xs">{{ "{:,.0f}".format(result.volume) }}</td>
+                            <td class="text-center">
+                                {% if result.is_latest %}
+                                <span class="badge badge-primary badge-sm">Latest</span>
+                                {% elif result.is_active %}
+                                <span class="badge badge-info badge-sm">Active</span>
+                                {% else %}
+                                <span class="badge badge-ghost badge-sm">Historical</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Summary Section -->
+    <div class="mt-6">
+        <h2 class="text-xl font-bold mb-4">Stock Summary</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for stock_summary in stock_summaries %}
+            <div class="card bg-base-200 shadow">
+                <div class="card-body p-4">
+                    <h3 class="font-bold text-lg">{{ stock_summary.symbol }}</h3>
+                    <div class="text-sm space-y-1">
+                        <p>Current Price: <span class="font-mono font-bold">{{ "%.2f"|format(stock_summary.current_price) }}</span></p>
+                        <p>Current Trend:
+                            <span class="badge badge-sm {% if stock_summary.trend == 'BULLISH' %}badge-success{% else %}badge-error{% endif %}">
+                                {{ stock_summary.trend }}
+                            </span>
+                        </p>
+                        <p>Total Crossovers: <span class="font-bold">{{ stock_summary.crossover_count }}</span></p>
+                        <p>Latest Signal:
+                            <span class="badge badge-sm {% if stock_summary.latest_signal == 'BUY' %}badge-success{% else %}badge-error{% endif %}">
+                                {{ stock_summary.latest_signal }}
+                            </span>
+                            @ {{ "%.2f"|format(stock_summary.latest_price) }}
+                        </p>
+                        <p class="text-xs opacity-70">{{ stock_summary.latest_date }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+/* Amibroker-style table styling */
+.table-zebra tbody tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark .table-zebra tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.table th {
+    font-weight: 600;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table td {
+    white-space: nowrap;
+}
+
+@media print {
+    .btn { display: none; }
+    .table { font-size: 10px; }
+}
+</style>
+
+<script>
+// Export to Excel functionality
+function exportToExcel() {
+    // Create CSV content
+    let csv = 'Ticker,Date/Time,Signal,Price,EMA10,EMA20,MACD,ATR,ATR%,Entry,Target,StopLoss,R:R,Volume,Status\\n';
+
+    const table = document.querySelector('table');
+    const rows = table.querySelectorAll('tbody tr');
+
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const rowData = [];
+        cells.forEach(cell => {
+            // Clean up the text
+            let text = cell.textContent.trim();
+            // Remove commas from numbers
+            text = text.replace(/,/g, '');
+            // Handle cells with badges
+            if (cell.querySelector('.badge')) {
+                text = cell.querySelector('.badge').textContent.trim();
+            }
+            rowData.push(text);
+        });
+        csv += rowData.join(',') + '\\n';
+    });
+
+    // Create blob and download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'exploration_results_' + new Date().toISOString().slice(0, 10) + '.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Auto-refresh if needed
+{% if auto_refresh %}
+setTimeout(() => location.reload(), 30000);
+{% endif %}
+</script>
+{% endblock %}

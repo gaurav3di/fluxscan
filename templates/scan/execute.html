@@ -484,9 +484,140 @@ function resetScanUI() {
 }
 
 function viewMetrics(metrics) {
-    // You can create a modal to show metrics
-    console.log('Metrics:', metrics);
-    FluxScan.showToast('Metrics: ' + JSON.stringify(metrics), 'info');
+    // Create modal content for exploration results
+    if (metrics.crossovers && metrics.crossovers.length > 0) {
+        showExplorationModal(metrics);
+    } else {
+        showSimpleMetricsModal(metrics);
+    }
+}
+
+function showExplorationModal(metrics) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('exploration-modal');
+    if (!modal) {
+        modal = document.createElement('dialog');
+        modal.id = 'exploration-modal';
+        modal.className = 'modal';
+        document.body.appendChild(modal);
+    }
+
+    // Build exploration content
+    let crossoversHtml = '';
+    metrics.crossovers.forEach(c => {
+        const signalClass = c.type === 'BUY' ? 'badge-success' : 'badge-error';
+        crossoversHtml += `
+            <tr>
+                <td class="text-xs">${c.date}</td>
+                <td><span class="badge ${signalClass} badge-sm">${c.type}</span></td>
+                <td class="text-right">${c.price}</td>
+                <td class="text-right">${c.ema10}</td>
+                <td class="text-right">${c.ema20}</td>
+                <td class="text-right">${c.atr.toFixed(2)}</td>
+                <td class="text-right">${c.entry}</td>
+                <td class="text-right text-success">${c.target}</td>
+                <td class="text-right text-error">${c.stop_loss}</td>
+            </tr>
+        `;
+    });
+
+    modal.innerHTML = `
+        <div class="modal-box max-w-4xl">
+            <h3 class="font-bold text-lg mb-4">Exploration Results - ${metrics.summary}</h3>
+
+            <!-- Current Status -->
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="stat bg-base-200 rounded p-2">
+                    <div class="stat-title text-xs">Current Price</div>
+                    <div class="stat-value text-sm">${metrics.current_price}</div>
+                </div>
+                <div class="stat bg-base-200 rounded p-2">
+                    <div class="stat-title text-xs">Current Trend</div>
+                    <div class="stat-value text-sm">
+                        <span class="badge ${metrics.current_trend === 'BULLISH' ? 'badge-success' : 'badge-error'}">
+                            ${metrics.current_trend}
+                        </span>
+                    </div>
+                </div>
+                <div class="stat bg-base-200 rounded p-2">
+                    <div class="stat-title text-xs">Total Crossovers</div>
+                    <div class="stat-value text-sm">${metrics.crossover_count}</div>
+                </div>
+            </div>
+
+            <!-- Crossovers Table -->
+            <div class="overflow-x-auto max-h-96">
+                <table class="table table-zebra table-xs w-full">
+                    <thead class="sticky top-0 bg-base-300">
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Signal</th>
+                            <th>Price</th>
+                            <th>EMA10</th>
+                            <th>EMA20</th>
+                            <th>ATR</th>
+                            <th>Entry</th>
+                            <th>Target</th>
+                            <th>Stop</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${crossoversHtml}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="modal-action">
+                <button class="btn btn-sm" onclick="this.closest('dialog').close()">Close</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    `;
+
+    modal.showModal();
+}
+
+function showSimpleMetricsModal(metrics) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('metrics-modal');
+    if (!modal) {
+        modal = document.createElement('dialog');
+        modal.id = 'metrics-modal';
+        modal.className = 'modal';
+        document.body.appendChild(modal);
+    }
+
+    // Build simple metrics content
+    let metricsHtml = '';
+    for (const [key, value] of Object.entries(metrics)) {
+        if (typeof value !== 'object') {
+            metricsHtml += `
+                <div class="flex justify-between py-1">
+                    <span class="text-sm font-medium">${key.replace(/_/g, ' ').toUpperCase()}:</span>
+                    <span class="text-sm">${value}</span>
+                </div>
+            `;
+        }
+    }
+
+    modal.innerHTML = `
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Signal Metrics</h3>
+            <div class="space-y-1">
+                ${metricsHtml}
+            </div>
+            <div class="modal-action">
+                <button class="btn btn-sm" onclick="this.closest('dialog').close()">Close</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    `;
+
+    modal.showModal();
 }
 
 function openChart(symbol) {

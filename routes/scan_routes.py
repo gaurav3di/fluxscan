@@ -67,7 +67,18 @@ def api_run_scan():
     def run_scan():
         try:
             # Merge scanner default parameters with provided parameters
-            scan_params = scanner.get_parameters()
+            # Extract default values from parameter definitions if they exist
+            raw_params = scanner.get_parameters()
+            scan_params = {}
+
+            # Handle both simple values and parameter definitions
+            for key, value in raw_params.items():
+                if isinstance(value, dict) and 'default' in value:
+                    scan_params[key] = value['default']
+                else:
+                    scan_params[key] = value
+
+            # Update with provided parameters
             scan_params.update(parameters)
             scan_params['exchange'] = watchlist.exchange
 

@@ -286,7 +286,18 @@ def api_test_scanner(id):
 
     # Get test symbols
     test_symbols = data.get('symbols', ['RELIANCE', 'TCS', 'INFY'])
-    test_params = data.get('parameters', scanner.get_parameters())
+
+    # Extract default values from parameter definitions
+    raw_params = scanner.get_parameters()
+    default_params = {}
+    for key, value in raw_params.items():
+        if isinstance(value, dict) and 'default' in value:
+            default_params[key] = value['default']
+        else:
+            default_params[key] = value
+
+    # Use provided parameters or defaults
+    test_params = data.get('parameters', default_params)
 
     # Get data service
     data_service = current_app.data_service

@@ -30,10 +30,7 @@ class ScannerEngine:
         start_time = time.time()
         total_symbols = len(symbols)
 
-        # Create a namespace for scanner execution
-        namespace = self._create_namespace(parameters)
-
-        # Compile scanner code
+        # Compile scanner code first
         try:
             compiled_code = compile(scanner_code, '<scanner>', 'exec')
         except SyntaxError as e:
@@ -67,10 +64,10 @@ class ScannerEngine:
                 )
 
                 if data is not None and not data.empty:
-                    # Execute scanner for this symbol
+                    # Execute scanner for this symbol (namespace is now created inside _execute_for_symbol)
                     result = self._execute_for_symbol(
                         compiled_code,
-                        namespace,
+                        None,  # Don't pass a shared namespace
                         data,
                         symbol,
                         parameters
@@ -104,19 +101,20 @@ class ScannerEngine:
 
     def _execute_for_symbol(self, compiled_code, namespace, data, symbol, parameters):
         try:
-            # Prepare data in namespace
-            local_namespace = namespace.copy()
-            local_namespace['data'] = data
-            local_namespace['df'] = data
+            # Create a fresh namespace for each symbol to avoid data contamination
+            local_namespace = self._create_namespace(parameters)
+            local_namespace['data'] = data.copy()  # Make a copy of the data
+            local_namespace['df'] = data.copy()
             local_namespace['symbol'] = symbol
             local_namespace['params'] = parameters
 
             # Add common data columns as Series for better compatibility
-            local_namespace['open'] = data['open'] if 'open' in data else pd.Series()
-            local_namespace['high'] = data['high'] if 'high' in data else pd.Series()
-            local_namespace['low'] = data['low'] if 'low' in data else pd.Series()
-            local_namespace['close'] = data['close'] if 'close' in data else pd.Series()
-            local_namespace['volume'] = data['volume'] if 'volume' in data else pd.Series()
+            # Make copies to ensure isolation
+            local_namespace['open'] = data['open'].copy() if 'open' in data.columns else pd.Series()
+            local_namespace['high'] = data['high'].copy() if 'high' in data.columns else pd.Series()
+            local_namespace['low'] = data['low'].copy() if 'low' in data.columns else pd.Series()
+            local_namespace['close'] = data['close'].copy() if 'close' in data.columns else pd.Series()
+            local_namespace['volume'] = data['volume'].copy() if 'volume' in data.columns else pd.Series()
 
             # Execute scanner code
             exec(compiled_code, local_namespace)
@@ -128,7 +126,7 @@ class ScannerEngine:
                     return {
                         'symbol': symbol,
                         'signal': 'EXPLORE',
-                        'metrics': local_namespace['columns'],
+                        'metrics': dict(local_namespace['columns']),  # Make a copy of columns
                         'timestamp': datetime.now().isoformat()
                     }
 
@@ -162,13 +160,16 @@ class ScannerEngine:
         # Columns storage for Amibroker-style exploration
         columns = {}
 
-        # AddColumn function (Amibroker style)
-        def AddColumn(name, value, format_spec='1.2'):
-            columns[name] = value
+        # AddColumn function (Amibroker style) - create a new closure for each namespace
+        def make_add_column(cols):
+            def AddColumn(name, value, format_spec='1.2'):
+                cols[name] = value
+            return AddColumn
 
         namespace = {
             'pd': pd,
             'np': np,
+            'numpy': np,  # Add numpy alias
             'talib': talib,
             'datetime': datetime,
             'parameters': parameters or {},
@@ -177,7 +178,7 @@ class ScannerEngine:
             'metrics': {},
             # Amibroker-style exploration
             'Filter': False,
-            'AddColumn': AddColumn,
+            'AddColumn': make_add_column(columns),
             'columns': columns
         }
 
@@ -230,9 +231,6 @@ class ScannerEngine:
         # Create result queue
         result_queue = queue.Queue()
 
-        # Create namespace
-        namespace = self._create_namespace(parameters)
-
         # Compile scanner code
         try:
             compiled_code = compile(scanner_code, '<scanner>', 'exec')
@@ -261,7 +259,7 @@ class ScannerEngine:
                     if data is not None and not data.empty:
                         result = self._execute_for_symbol(
                             compiled_code,
-                            namespace,
+                            None,  # Don't pass a shared namespace
                             data,
                             symbol,
                             parameters
